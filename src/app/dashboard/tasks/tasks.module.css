@@ -1,0 +1,137 @@
+.pageWrapper {
+  position: relative;
+  min-height: calc(100vh - 64px);
+}
+
+.notificationWrapper {
+  position: fixed;
+  top: 22px;
+  right: 28px;
+  z-index: 100;
+}
+
+.notifBell {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notifBell:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  background: #dc2626;
+  color: white;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+.notifOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.notifPanel {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 380px;
+  max-height: 480px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+  overflow: hidden;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.notifHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.notifHeader h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.markReadBtn {
+  font-size: 12px;
+  color: #1d4ed8;
+  font-weight: 650;
+}
+
+.markReadBtn:hover {
+  color: #1e40af;
+}
+
+.notifList {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.noNotif {
+  text-align: center;
+  padding: 30px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.notifItem {
+  padding: 14px 20px;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.notifItem.unread {
+  background: #eff6ff;
+}
+
+.notifTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.notifMessage {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.notifTime {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 6px;
+  display: block;
+}

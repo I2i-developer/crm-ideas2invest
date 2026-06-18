@@ -1,0 +1,147 @@
+.container {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.progress {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.addForm {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.addInput {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.addInput:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.addBtn {
+  padding: 10px;
+  background: #6366f1;
+  color: white;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.addBtn:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 16px 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.item:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.item.completed .itemText {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.checkBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  color: white;
+}
+
+.checkBtn.checked {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.checkBtn:not(.checked):hover {
+  border-color: #6366f1;
+}
+
+.itemText {
+  flex: 1;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.deleteBtn {
+  padding: 4px;
+  color: #94a3b8;
+  border-radius: 6px;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.item:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}

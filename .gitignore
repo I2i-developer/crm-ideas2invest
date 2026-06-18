@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+src/lib/google/vision-key.json
+.next-dev-*.log
 
 # debug
 npm-debug.log*
