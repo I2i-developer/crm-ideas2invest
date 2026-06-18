@@ -26,6 +26,12 @@
 src/lib/google/vision-key.json
 .next-dev-*.log
 
+# local/internal project artifacts
+/supabase/
+/CRM_PRD.md
+/Updated DOB.xlsx
+/AMC'S FORM.xlsx
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -41,6 +47,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-#files
-/supabase
