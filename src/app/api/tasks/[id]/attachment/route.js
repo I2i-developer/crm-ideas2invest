@@ -28,9 +28,27 @@ async function authorizeTaskAccess(supabase, taskId, userId) {
     .single();
 
   const role = String(profile?.role || "").trim().toLowerCase();
-  if (role === "admin" || role === "operations") {
+  if (role === "admin") {
     return { task };
   }
+
+  if (role === "operations") {
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("task_assignments")
+      .select("id")
+      .eq("task_id", taskId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (assignmentError) {
+      return { response: NextResponse.json({ error: assignmentError.message }, { status: 500 }) };
+    }
+
+    if (assignment) {
+      return { task };
+    }
+  }
+
   return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
 }
 

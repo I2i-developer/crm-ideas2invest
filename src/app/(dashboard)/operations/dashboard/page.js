@@ -90,12 +90,12 @@ export default function OperationsDashboard() {
       <PageHeader
         eyebrow="Operations workspace"
         title="Operations Dashboard"
-        description="Team work queue, alerts, document actions, and client birthdays."
+        description="Your assigned work, alerts, document actions, and client birthdays."
         icon={ClipboardList}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <Card title="Team Tasks" value={metrics.pending_tasks || 0} icon={ClipboardList} href="/dashboard/tasks" />
+        <Card title="Assigned Tasks" value={metrics.pending_tasks || 0} icon={ClipboardList} href="/dashboard/tasks" />
         <Card title="Overdue" value={metrics.overdue_tasks || 0} icon={AlertTriangle} tone="red" href="/dashboard/tasks" />
         <Card title="Due Today" value={metrics.due_today_tasks || 0} icon={CalendarDays} tone="amber" href="/dashboard/tasks" />
         <Card title="My SIP Follow-ups" value={metrics.my_sip_followups_pending || 0} icon={PauseCircle} tone="amber" href="/admin/sip-tracker?follow_up_status=pending" />
@@ -111,9 +111,9 @@ export default function OperationsDashboard() {
 
       <div className="grid xl:grid-cols-2 gap-5">
         <List
-          title="Recent Team Tasks"
+          title="Recently Assigned Tasks"
           items={data?.recent_tasks || []}
-          empty="No team tasks."
+          empty="No assigned tasks."
           render={(task) => (
             <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block rounded-lg border bg-white p-3 hover:bg-blue-50">
               <p className="font-medium text-gray-800">{task.title}</p>

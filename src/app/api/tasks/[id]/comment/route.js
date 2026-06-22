@@ -55,7 +55,8 @@ export async function POST(request, { params }) {
   }
 
   const role = String(profile?.role || "").trim().toLowerCase();
-  if (!["admin", "operations"].includes(role)) {
+  const isAssigned = (assignments || []).some((assignment) => assignment.user_id === user.id);
+  if (role !== "admin" && !(role === "operations" && isAssigned)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,

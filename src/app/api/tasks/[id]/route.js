@@ -47,6 +47,23 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
+  if (role === "operations") {
+    const { data: assignment, error: assignmentError } = await taskDb
+      .from("task_assignments")
+      .select("id")
+      .eq("task_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (assignmentError) {
+      return NextResponse.json({ error: assignmentError.message }, { status: 500 });
+    }
+
+    if (!assignment) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+  }
+
   const task = await hydrateTaskDetail(taskDb, baseTask);
 
   return NextResponse.json({ task }, { status: 200 });
@@ -101,7 +118,7 @@ export async function PUT(request, { params }) {
 
   const isAssigned = existingTaskWithAssignments.task_assignments?.some(a => a.user_id === user.id);
   const role = String(profile?.role || "").trim().toLowerCase();
-  if (!["admin", "operations"].includes(role)) {
+  if (role !== "admin" && !(role === "operations" && isAssigned)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,
@@ -128,9 +145,6 @@ export async function PUT(request, { params }) {
 
   const updates = {};
   const activityLog = { task_id: id, action_type: "updated", performed_by: user.id, metadata: {} };
-  if (role === "operations" && !isAssigned) {
-    activityLog.metadata.team_coverage = true;
-  }
 
   if (role === "admin") {
     if (title !== undefined) { updates.title = title; activityLog.metadata.title = title; }

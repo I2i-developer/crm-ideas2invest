@@ -127,6 +127,11 @@ function inferEventType(row) {
   return "unknown";
 }
 
+function isNormalSipRow(row) {
+  const flag = String(row.sip_flag || "").trim().toLowerCase();
+  return flag.includes("sip") && !flag.includes("stp");
+}
+
 function stableFingerprint(row) {
   const parts = [
     row.folio_no,
@@ -225,7 +230,12 @@ export async function parseSipReportFile({ buffer, fileName }) {
   const rows = buildRowsFromHeaderMatrix(matrix);
   if (!rows.length) throw new Error("Uploaded SIP report is empty.");
 
-  return rows.map(normalizeRow);
+  const sipRows = rows.map(normalizeRow).filter(isNormalSipRow);
+  if (!sipRows.length) {
+    throw new Error("No Normal SIP rows found. Normal STP rows are ignored by the SIP tracker.");
+  }
+
+  return sipRows;
 }
 
 function normalizeName(value = "") {

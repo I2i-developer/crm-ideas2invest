@@ -133,7 +133,11 @@ export async function GET(request) {
     ...getTaskLifecycle(task, taskActivityRes.data || []),
     task_assignments: assignmentsByTask.get(task.id) || [],
   }));
-  const visibleTasks = allTasks;
+  const visibleTasks = admin
+    ? allTasks
+    : allTasks.filter((task) =>
+        task.task_assignments?.some((assignment) => assignment.user_id === user.id)
+      );
 
   const visibleClientIds = new Set((clientsRes.data || []).map((client) => client.id));
   const visibleDocuments = (documentsRes.data || []).filter((document) => visibleClientIds.has(document.client_id));

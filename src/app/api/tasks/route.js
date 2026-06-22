@@ -43,6 +43,22 @@ export async function GET(request) {
   }
 
   let assignedTaskIds = null;
+  if (role === "operations") {
+    const { data: assignments, error: assignmentError } = await taskDb
+      .from("task_assignments")
+      .select("task_id")
+      .eq("user_id", user.id);
+
+    if (assignmentError) {
+      return NextResponse.json({ error: assignmentError.message }, { status: 500 });
+    }
+
+    assignedTaskIds = (assignments || []).map((assignment) => assignment.task_id);
+    if (assignedTaskIds.length === 0) {
+      return NextResponse.json({ tasks: [] }, { status: 200 });
+    }
+  }
+
   if (assignedUser && assignedUser !== "all") {
     const { data: assignments, error: assignmentFilterError } = await taskDb
       .from("task_assignments")
