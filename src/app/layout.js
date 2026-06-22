@@ -16,6 +16,14 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "i2i DocHub",
   description: "Ideas2Invest document and task management hub",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/images/logo/logo.png", type: "image/png" },
+    ],
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }) {

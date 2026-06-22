@@ -1,9 +1,9 @@
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
-  "https://ideas2invest.in";
+  "https://crm.ideas2invest.com";
 
-const title = "Ideas2Invest CRM | Secure Client Operations Login";
+const title = "Ideas2Invest CRM";
 const description =
   "Sign in to the Ideas2Invest CRM for client onboarding, documents, tasks, SIP tracking, insurance renewals, and team operations.";
 
