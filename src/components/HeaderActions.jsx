@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, X } from "lucide-react";
 import toast from "react-hot-toast";
 import CrmTooltip from "@/components/CrmTooltip";
 import ChatLauncher from "@/components/ChatLauncher";
@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 export default function HeaderActions() {
   const [open, setOpen] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -48,6 +49,23 @@ export default function HeaderActions() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!open && !imageOpen) return undefined;
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        if (imageOpen) {
+          setImageOpen(false);
+        } else {
+          setOpen(false);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [imageOpen, open]);
 
   async function logout() {
     const { error } = await supabase.auth.signOut();
@@ -99,14 +117,23 @@ export default function HeaderActions() {
           <div className="fixed left-3 right-3 top-[4.25rem] z-50 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-14 sm:w-[min(360px,calc(100vw-2rem))]">
             <div className="border-b border-gray-100 p-5">
               <div className="flex items-center gap-4">
-                <Image
-                  src={profile.avatar}
-                  alt="Profile"
-                  width={88}
-                  height={88}
-                  unoptimized
-                  className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-lg sm:h-[88px] sm:w-[88px]"
-                />
+                <CrmTooltip content="Expand profile image" side="bottom">
+                  <button
+                    type="button"
+                    onClick={() => setImageOpen(true)}
+                    className="shrink-0 rounded-full outline-none ring-offset-2 transition hover:scale-[1.03] focus:ring-2 focus:ring-blue-400"
+                    aria-label="Expand profile image"
+                  >
+                    <Image
+                      src={profile.avatar}
+                      alt="Profile"
+                      width={88}
+                      height={88}
+                      unoptimized
+                      className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-lg sm:h-[88px] sm:w-[88px]"
+                    />
+                  </button>
+                </CrmTooltip>
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-gray-900">{profile.name}</p>
                   <p className="truncate text-sm text-gray-500">{profile.email}</p>
@@ -137,6 +164,39 @@ export default function HeaderActions() {
                 <LogOut size={17} />
                 Logout
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {imageOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close profile image"
+            className="fixed inset-0 z-[80] cursor-default bg-slate-950/65 backdrop-blur-sm"
+            onClick={() => setImageOpen(false)}
+          />
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-5">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setImageOpen(false)}
+                className="absolute -right-3 -top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white text-slate-700 shadow-xl transition hover:text-slate-950"
+                aria-label="Close profile image"
+              >
+                <X size={20} />
+              </button>
+              <div className="h-[min(72vw,420px)] w-[min(72vw,420px)] overflow-hidden rounded-full border-[10px] border-white bg-slate-100 shadow-[0_32px_100px_rgba(15,23,42,0.35)]">
+                <Image
+                  src={profile.avatar}
+                  alt="Profile"
+                  width={420}
+                  height={420}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              </div>
             </div>
           </div>
         </>
