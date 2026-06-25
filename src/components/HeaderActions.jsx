@@ -134,10 +134,12 @@ export default function HeaderActions() {
                     />
                   </button>
                 </CrmTooltip>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-gray-900">{profile.name}</p>
-                  <p className="truncate text-sm text-gray-500">{profile.email}</p>
-                  {profile.designation && <p className="truncate text-xs text-gray-400">{profile.designation}</p>}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="truncate text-base font-semibold leading-5 text-gray-900">{profile.name}</p>
+                  <p className="break-all text-sm leading-5 text-gray-500">{profile.email}</p>
+                  {profile.designation && (
+                    <p className="truncate text-xs font-medium leading-4 text-gray-400">{profile.designation}</p>
+                  )}
                 </div>
               </div>
               {profile.role && (

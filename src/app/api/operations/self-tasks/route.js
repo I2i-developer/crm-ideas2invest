@@ -69,7 +69,6 @@ export async function GET(request) {
     .order("task_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (!isAdmin(role)) query = query.eq("created_by", user.id);
   if (searchParams.get("status")) query = query.eq("status", searchParams.get("status"));
   if (searchParams.get("date_from")) query = query.gte("task_date", searchParams.get("date_from"));
   if (searchParams.get("date_to")) query = query.lte("task_date", searchParams.get("date_to"));
@@ -89,7 +88,7 @@ export async function GET(request) {
     return matchesSearch && matchesDoneBy;
   });
 
-  return NextResponse.json({ tasks, users: await listProfiles(db), role });
+  return NextResponse.json({ tasks, users: await listProfiles(db), role, current_user_id: user.id });
 }
 
 export async function POST(request) {

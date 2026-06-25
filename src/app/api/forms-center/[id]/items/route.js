@@ -51,7 +51,9 @@ export async function POST(request, { params }) {
   const { id } = await params;
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await request.json();
   const payload = {

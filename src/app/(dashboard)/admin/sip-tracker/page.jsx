@@ -77,6 +77,10 @@ function formatSipDate(value) {
   return formatDateDDMonYYYY(value, "-");
 }
 
+function sipEventDate(event) {
+  return event.termination_date || event.end_date || event.start_date || event.sip_registration_date;
+}
+
 function chipClass(value) {
   const styles = {
     terminated: "bg-orange-100 text-orange-800 border-orange-200",
@@ -604,7 +608,7 @@ export default function SipTrackerPage() {
                         onTooltipLeave={() => setRemarksTooltip(null)}
                       />
                     </td>
-                    <td className="px-3 py-3 align-top text-gray-700">{formatSipDate(event.termination_date)}</td>
+                    <td className="px-3 py-3 align-top text-gray-700">{formatSipDate(sipEventDate(event))}</td>
                     <td className="px-3 py-3 align-top">
                       {(() => {
                         const contact = displayContact(event);

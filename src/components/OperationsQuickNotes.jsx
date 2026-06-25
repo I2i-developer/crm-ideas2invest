@@ -34,6 +34,7 @@ function notePreview(content = "") {
 export default function OperationsQuickNotes({ role }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [query, setQuery] = useState("");
   const [activeNoteId, setActiveNoteId] = useState(null);
   const [mode, setMode] = useState("list");
@@ -44,6 +45,10 @@ export default function OperationsQuickNotes({ role }) {
 
   const visible = role === "operations" || role === "admin";
   const activeNote = notes.find((note) => note.id === activeNoteId) || null;
+  const canManageNote = useCallback(
+    (note) => role === "admin" || note?.created_by === currentUserId,
+    [currentUserId, role]
+  );
 
   const filteredNotes = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -63,6 +68,7 @@ export default function OperationsQuickNotes({ role }) {
       return;
     }
     setNotes(data.notes || []);
+    setCurrentUserId(data.current_user_id || "");
   }, []);
 
   useEffect(() => {
@@ -90,6 +96,10 @@ export default function OperationsQuickNotes({ role }) {
   }
 
   function startEdit(note) {
+    if (!canManageNote(note)) {
+      toast.error("Only the note owner can edit this note");
+      return;
+    }
     setActiveNoteId(note.id);
     setForm({
       title: note.title || "",
@@ -134,6 +144,10 @@ export default function OperationsQuickNotes({ role }) {
   }
 
   async function togglePin(note) {
+    if (!canManageNote(note)) {
+      toast.error("Only the note owner can pin this note");
+      return;
+    }
     const response = await authFetch(`/api/operations/notes/${note.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -257,9 +271,11 @@ export default function OperationsQuickNotes({ role }) {
                                 </span>
                                 <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{notePreview(note.content)}</p>
                               </button>
-                              <button type="button" onClick={() => togglePin(note)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-amber-50 hover:text-amber-600" aria-label={note.pinned ? "Unpin note" : "Pin note"}>
-                                <Pin size={15} className={note.pinned ? "fill-current" : ""} />
-                              </button>
+                              {canManageNote(note) && (
+                                <button type="button" onClick={() => togglePin(note)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-amber-50 hover:text-amber-600" aria-label={note.pinned ? "Unpin note" : "Pin note"}>
+                                  <Pin size={15} className={note.pinned ? "fill-current" : ""} />
+                                </button>
+                              )}
                             </div>
                             <button type="button" onClick={() => openNote(note)} className="mt-3 block w-full border-t border-slate-100 pt-3 text-left text-[11px] text-slate-400">
                               {note.created_by_name} · Updated {formatDate(note.updated_at)}
@@ -287,15 +303,19 @@ export default function OperationsQuickNotes({ role }) {
                       <CrmTooltip content="Copy content" side="bottom">
                         <button type="button" onClick={() => copyNote(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Copy size={15} /></button>
                       </CrmTooltip>
-                      <CrmTooltip content={activeNote.pinned ? "Unpin note" : "Pin note"} side="bottom">
-                        <button type="button" onClick={() => togglePin(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700"><Pin size={15} className={activeNote.pinned ? "fill-current" : ""} /></button>
-                      </CrmTooltip>
-                      <CrmTooltip content="Edit note" side="bottom">
-                        <button type="button" onClick={() => startEdit(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Pencil size={15} /></button>
-                      </CrmTooltip>
-                      <CrmTooltip content="Delete note" side="bottom">
-                        <button type="button" onClick={() => setDeleteTarget(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-100 text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>
-                      </CrmTooltip>
+                      {canManageNote(activeNote) && (
+                        <>
+                          <CrmTooltip content={activeNote.pinned ? "Unpin note" : "Pin note"} side="bottom">
+                            <button type="button" onClick={() => togglePin(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-700"><Pin size={15} className={activeNote.pinned ? "fill-current" : ""} /></button>
+                          </CrmTooltip>
+                          <CrmTooltip content="Edit note" side="bottom">
+                            <button type="button" onClick={() => startEdit(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700"><Pencil size={15} /></button>
+                          </CrmTooltip>
+                          <CrmTooltip content="Delete note" side="bottom">
+                            <button type="button" onClick={() => setDeleteTarget(activeNote)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-100 text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>
+                          </CrmTooltip>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="mt-5 whitespace-pre-wrap rounded-2xl border border-amber-100 bg-amber-50/50 p-5 text-sm leading-7 text-slate-700">

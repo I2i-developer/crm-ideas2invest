@@ -19,9 +19,6 @@ const EMPTY_BIRTHDAY_FORM = {
   person_name: "",
   person_type: "Client",
   date_of_birth: "",
-  mobile: "",
-  email: "",
-  notes: "",
 };
 
 function buildCalendar(year, month) {
@@ -348,7 +345,7 @@ export default function BirthdayCalendarPage() {
             className="fixed inset-0 z-40 h-screen bg-slate-950/35 backdrop-blur-sm"
             onClick={() => setShowAddBirthday(false)}
           />
-          <div className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-2xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-pink-50 via-white to-blue-50 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Add client birthday</h2>
@@ -365,18 +362,11 @@ export default function BirthdayCalendarPage() {
             <form onSubmit={addBirthday} className="p-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormInput
-                  label="Client/person name"
+                  label="Client name"
                   name="person_name"
                   required
                   value={birthdayForm.person_name}
                   onValueChange={(value) => setBirthdayForm((current) => ({ ...current, person_name: value }))}
-                />
-                <FormSelect
-                  label="Person type"
-                  name="person_type"
-                  value={birthdayForm.person_type}
-                  onValueChange={(value) => setBirthdayForm((current) => ({ ...current, person_type: value }))}
-                  options={["Client", "Primary Holder", "Second Holder", "Third Holder", "Minor Holder"]}
                 />
                 <FormInput
                   label="Date of birth"
@@ -385,25 +375,6 @@ export default function BirthdayCalendarPage() {
                   required
                   value={birthdayForm.date_of_birth}
                   onValueChange={(value) => setBirthdayForm((current) => ({ ...current, date_of_birth: value }))}
-                />
-                <FormInput
-                  label="Mobile"
-                  name="mobile"
-                  value={birthdayForm.mobile}
-                  onValueChange={(value) => setBirthdayForm((current) => ({ ...current, mobile: value }))}
-                />
-                <FormInput
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={birthdayForm.email}
-                  onValueChange={(value) => setBirthdayForm((current) => ({ ...current, email: value }))}
-                />
-                <FormInput
-                  label="Notes"
-                  name="notes"
-                  value={birthdayForm.notes}
-                  onValueChange={(value) => setBirthdayForm((current) => ({ ...current, notes: value }))}
                 />
               </div>
               <div className="mt-5 flex justify-end gap-3">

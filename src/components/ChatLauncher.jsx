@@ -241,6 +241,7 @@ export default function ChatLauncher() {
   }
 
   function readStatusFor(message) {
+    if (currentRole === "operations") return "";
     if (message.sender_id !== currentUserId || message.deleted_at) return "";
     const reads = (message.read_receipts || []).filter((receipt) => receipt.user_id !== currentUserId);
     if (!reads.length) return "Sent";

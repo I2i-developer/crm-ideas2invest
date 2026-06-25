@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { encryptSecret } from "@/lib/security/credentials";
 
@@ -37,7 +37,7 @@ export async function POST(request) {
     const { user, profile, role } = await getAuthContext(supabase);
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAdmin(role)) {
+    if (!isAdmin(role) && !isOperations(role)) {
       await writeAuditLog(supabase, {
         actor: user,
         profile,

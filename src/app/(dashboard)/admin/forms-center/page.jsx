@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   FileStack,
+  FileText,
   FolderOpen,
   Pencil,
   Plus,
@@ -25,6 +26,7 @@ const EMPTY_ORGANIZATION = {
   display_name: "",
   organization_type: "AMC",
   forms_url: "",
+  factsheet_url: "",
   description: "",
   display_order: 0,
   active: true,
@@ -105,6 +107,18 @@ function ExternalButton({ onClick, children, quiet = false }) {
   );
 }
 
+function FactsheetButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900"
+    >
+      <FileText size={14} /> Factsheet
+    </button>
+  );
+}
+
 export default function FormsInformationCenterPage() {
   const [organizations, setOrganizations] = useState([]);
   const [role, setRole] = useState("");
@@ -125,6 +139,7 @@ export default function FormsInformationCenterPage() {
   const [verifying, setVerifying] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const admin = role === "admin";
+  const canManageForms = role === "admin" || role === "operations";
 
   const loadOrganizations = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -193,6 +208,7 @@ export default function FormsInformationCenterPage() {
       display_name: organization.display_name,
       organization_type: organization.organization_type,
       forms_url: organization.forms_url,
+      factsheet_url: organization.factsheet_url || "",
       description: organization.description || "",
       display_order: organization.display_order || 0,
       active: organization.active !== false,
@@ -305,13 +321,15 @@ export default function FormsInformationCenterPage() {
         title="Forms Information Center"
         description="Find an AMC or RTA, choose the required form, and open the official source instantly."
         tone="emerald"
-        actions={admin && (
+        actions={canManageForms && (
           <>
-            <CrmTooltip content="Verify official directory links">
-              <button type="button" onClick={() => verifyLinks()} disabled={verifying} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-60">
-                <RefreshCw size={17} className={verifying ? "animate-spin" : ""} />
-              </button>
-            </CrmTooltip>
+            {admin && (
+              <CrmTooltip content="Verify official directory links">
+                <button type="button" onClick={() => verifyLinks()} disabled={verifying} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-60">
+                  <RefreshCw size={17} className={verifying ? "animate-spin" : ""} />
+                </button>
+              </CrmTooltip>
+            )}
             <button type="button" onClick={() => editOrganization()} className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">
               <Plus size={16} /> Add organization
             </button>
@@ -346,7 +364,7 @@ export default function FormsInformationCenterPage() {
           ) : visibleOrganizations.length === 0 ? (
             <p className="p-10 text-center text-sm font-medium text-slate-500">No organization matches your search.</p>
           ) : visibleOrganizations.map((organization) => (
-            <article key={organization.id} className={`grid gap-4 p-4 transition hover:bg-blue-50/30 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_auto_minmax(220px,0.8fr)_auto] lg:items-center ${!organization.active ? "opacity-55" : ""}`}>
+            <article key={organization.id} className={`grid gap-4 p-4 transition hover:bg-blue-50/30 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_auto_minmax(160px,0.6fr)_auto] lg:items-center ${!organization.active ? "opacity-55" : ""}`}>
               <button type="button" onClick={() => loadForms(organization)} className="flex min-w-0 items-center gap-3 text-left">
                 <Logo organization={organization} />
                 <span className="min-w-0">
@@ -367,19 +385,31 @@ export default function FormsInformationCenterPage() {
                 </ExternalButton>
               </div>
 
-              <p className="line-clamp-2 text-xs leading-5 text-slate-500">{organization.description || "Official forms and information-center page."}</p>
+              <div className="flex items-center lg:justify-start">
+                {organization.factsheet_url ? (
+                  <FactsheetButton onClick={() => openExternal(organization.factsheet_url, organization.id)} />
+                ) : (
+                  <span className="inline-flex h-9 items-center rounded-xl border border-slate-100 bg-slate-50 px-3 text-xs font-semibold text-slate-400">
+                    No factsheet
+                  </span>
+                )}
+              </div>
 
-              {admin && (
+              {canManageForms && (
                 <div className="flex items-center justify-end gap-2">
+                  {admin && (
+                    <>
                   <CrmTooltip content={`${organization.verification_status || "unknown"} · ${organization.last_http_status || "not checked"}`}>
                     <button type="button" onClick={() => verifyLinks(organization.id)} disabled={verifying} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><RefreshCw size={15} /></button>
                   </CrmTooltip>
+                    </>
+                  )}
                   <CrmTooltip content="Edit organization">
                     <button type="button" onClick={() => editOrganization(organization)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><Pencil size={15} /></button>
                   </CrmTooltip>
-                  <CrmTooltip content="Archive organization">
+                  {admin && <CrmTooltip content="Archive organization">
                     <button type="button" onClick={() => setArchiveTarget({ kind: "organization", item: organization })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
-                  </CrmTooltip>
+                  </CrmTooltip>}
                 </div>
               )}
             </article>
@@ -406,7 +436,7 @@ export default function FormsInformationCenterPage() {
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input value={formsSearch} onChange={(event) => setFormsSearch(event.target.value)} placeholder="Search forms, KYC, SIP..." className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" />
                 </div>
-                {admin && <button type="button" onClick={() => editForm()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus size={16} /> Add form link</button>}
+                {canManageForms && <button type="button" onClick={() => editForm()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus size={16} /> Add form link</button>}
               </div>
             </header>
             <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
@@ -427,10 +457,10 @@ export default function FormsInformationCenterPage() {
                       {form.description && <p className="mt-1 text-xs leading-5 text-slate-500">{form.description}</p>}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      {admin && (
+                      {canManageForms && (
                         <>
                           <CrmTooltip content="Edit form link"><button type="button" onClick={() => editForm(form)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><Pencil size={15} /></button></CrmTooltip>
-                          <CrmTooltip content="Archive form link"><button type="button" onClick={() => setArchiveTarget({ kind: "form", item: form })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button></CrmTooltip>
+                          {admin && <CrmTooltip content="Archive form link"><button type="button" onClick={() => setArchiveTarget({ kind: "form", item: form })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button></CrmTooltip>}
                         </>
                       )}
                       <ExternalButton onClick={() => openExternal(form.form_url, selectedOrganization.id)}>Open form <ExternalLink size={14} /></ExternalButton>
@@ -448,6 +478,7 @@ export default function FormsInformationCenterPage() {
           <FormInput label="Organization name" name="display_name" required value={organizationForm.display_name} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, display_name: value }))} />
           <FormSelect label="Organization type" name="organization_type" required value={organizationForm.organization_type} options={["RTA", "AMC", "Other"]} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, organization_type: value }))} />
           <FormInput label="Official forms directory URL" name="forms_url" required value={organizationForm.forms_url} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, forms_url: value }))} className="sm:col-span-2" />
+          <FormInput label="Factsheet URL" name="factsheet_url" value={organizationForm.factsheet_url} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, factsheet_url: value }))} className="sm:col-span-2" />
           <FormInput label="Description" name="description" multiline rows={3} value={organizationForm.description} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, description: value }))} className="sm:col-span-2" />
           <FormInput label="Display order" name="display_order" type="number" value={organizationForm.display_order} onValueChange={(value) => setOrganizationForm((current) => ({ ...current, display_order: value }))} />
           <ActiveToggle checked={organizationForm.active} onChange={(active) => setOrganizationForm((current) => ({ ...current, active }))} />

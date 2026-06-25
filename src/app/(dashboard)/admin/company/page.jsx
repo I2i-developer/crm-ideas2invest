@@ -249,77 +249,106 @@ export default function CompanyPage() {
       </div>
 
       {canEditCredentials && (
-      <div className="grid xl:grid-cols-[380px_1fr] gap-6">
-        {(isAdmin || editingId) && (
-        <form onSubmit={saveCredential} className="glass-card p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <KeyRound className="text-violet-700" />
-            <h2 className="text-xl font-semibold text-gray-800">{credentialTitle}</h2>
-          </div>
-          <FormInput label="Platform" name="platform" value={credentialForm.platform} onValueChange={(value) => setCredentialForm({ ...credentialForm, platform: value })} required />
-          <FormInput label="Login URL" name="login_url" value={credentialForm.login_url} onValueChange={(value) => setCredentialForm({ ...credentialForm, login_url: value })} />
-          <FormInput label="Username" name="username" value={credentialForm.username} onValueChange={(value) => setCredentialForm({ ...credentialForm, username: value })} />
-          <FormInput label={editingId ? "New Secret (optional)" : "Password"} name="secret" type="password" value={credentialForm.secret} onValueChange={(value) => setCredentialForm({ ...credentialForm, secret: value })} />
-          <FormInput label="Notes" name="notes" value={credentialForm.notes} onValueChange={(value) => setCredentialForm({ ...credentialForm, notes: value })} multiline />
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={credentialForm.active} onChange={(event) => setCredentialForm({ ...credentialForm, active: event.target.checked })} />
-            Active
-          </label>
-          <div className="flex gap-2">
-            <button className="rounded-lg bg-blue-700 px-4 py-2 text-white">{editingId ? "Update" : "Add"}</button>
-            {editingId && (
-              <button type="button" onClick={() => { setEditingId(null); setCredentialForm(emptyCredential); }} className="rounded-lg border px-4 py-2 text-gray-700">
-                Cancel
+        <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
+          <form onSubmit={saveCredential} className="glass-card space-y-4 p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
+                <KeyRound size={20} />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{credentialTitle}</h2>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {isAdmin ? "Store and manage portal access securely." : "Add or update portal access for team use. Delete remains admin-only."}
+                </p>
+              </div>
+            </div>
+            <FormInput label="Platform" name="platform" value={credentialForm.platform} onValueChange={(value) => setCredentialForm({ ...credentialForm, platform: value })} required />
+            <FormInput label="Login URL" name="login_url" value={credentialForm.login_url} onValueChange={(value) => setCredentialForm({ ...credentialForm, login_url: value })} />
+            <FormInput label="Username" name="username" value={credentialForm.username} onValueChange={(value) => setCredentialForm({ ...credentialForm, username: value })} />
+            <FormInput label={editingId ? "New Secret (optional)" : "Password"} name="secret" type="password" value={credentialForm.secret} onValueChange={(value) => setCredentialForm({ ...credentialForm, secret: value })} />
+            <FormInput label="Notes" name="notes" value={credentialForm.notes} onValueChange={(value) => setCredentialForm({ ...credentialForm, notes: value })} multiline />
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 bg-white/70 px-3 py-2.5 text-sm font-semibold text-gray-700">
+              <span>Active credential</span>
+              <input type="checkbox" checked={credentialForm.active} onChange={(event) => setCredentialForm({ ...credentialForm, active: event.target.checked })} className="h-4 w-4 accent-blue-600" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60">
+                {editingId ? "Update Credential" : "Add Credential"}
               </button>
+              {editingId && (
+                <button type="button" onClick={() => { setEditingId(null); setCredentialForm(emptyCredential); }} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div className="glass-card p-6">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Portal Credentials</h2>
+                <p className="mt-1 text-sm text-gray-500">Masked credential vault for AMC, RTA, exchange, and insurance portals.</p>
+              </div>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                {credentials.length} saved
+              </span>
+            </div>
+
+            {credentials.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-white/70 p-10 text-center">
+                <KeyRound className="mx-auto text-gray-300" />
+                <p className="mt-3 text-sm font-semibold text-gray-700">No credentials added yet.</p>
+                <p className="mt-1 text-xs text-gray-500">Use the form to add the first portal credential.</p>
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {credentials.map((credential) => (
+                  <article key={credential.id} className="rounded-2xl border border-gray-100 bg-white/80 p-4 shadow-sm transition hover:border-blue-100 hover:shadow-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-sm font-semibold text-gray-900">{credential.platform}</h3>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${credential.active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                            {credential.active ? "Active" : "Hidden"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Username</p>
+                        <p className="mt-0.5 truncate text-sm text-gray-700">{credential.username || "-"}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={() => revealCredential(credential.id)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-blue-50 hover:text-blue-700" aria-label={revealed[credential.id] ? "Hide password" : "Reveal password"}>
+                          {revealed[credential.id] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        {isAdmin && (
+                          <button type="button" onClick={() => setCredentialToDelete(credential)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-100 text-red-600 transition hover:bg-red-50" aria-label="Delete credential">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700">
+                      {revealed[credential.id] || (credential.has_secret ? "********" : "-")}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      {credential.login_url ? (
+                        <a className="text-xs font-semibold text-blue-700 transition hover:text-blue-900" href={credential.login_url} target="_blank" rel="noreferrer">
+                          Open portal
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">No portal URL</span>
+                      )}
+                      <button type="button" onClick={() => editCredential(credential)} className="rounded-xl border border-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">
+                        Edit
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
             )}
           </div>
-        </form>
-        )}
-
-        <div className={`glass-card p-6 ${isAdmin || editingId ? "" : "xl:col-span-2"}`}>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Portal Credentials</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-gray-500">
-                <tr>
-                  <th className="py-3">Platform</th>
-                  <th>Username</th>
-                  <th>Password</th>
-                  <th>Status</th>
-                  <th className="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {credentials.map((credential) => (
-                  <tr key={credential.id}>
-                    <td className="py-3">
-                      <p className="font-medium text-gray-800">{credential.platform}</p>
-                      {credential.login_url && <a className="text-xs text-blue-700" href={credential.login_url} target="_blank" rel="noreferrer">Open portal</a>}
-                    </td>
-                    <td>{credential.username || "-"}</td>
-                    <td className="font-mono">{revealed[credential.id] || (credential.has_secret ? "********" : "-")}</td>
-                    <td>{credential.active ? "Active" : "Hidden"}</td>
-                    <td className="text-right space-x-2">
-                      <button type="button" onClick={() => revealCredential(credential.id)} className="rounded-lg border px-2 py-1 text-gray-700">
-                        {revealed[credential.id] ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button type="button" onClick={() => editCredential(credential)} className="rounded-lg border px-3 py-1 text-blue-700">Edit</button>
-                      {isAdmin && (
-                        <button type="button" onClick={() => setCredentialToDelete(credential)} className="rounded-lg border px-2 py-1 text-red-600">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {credentials.length === 0 && (
-                  <tr><td colSpan="5" className="py-6 text-center text-gray-500">No credentials added yet.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        </section>
       )}
       <ConfirmDialog
         open={Boolean(credentialToDelete)}

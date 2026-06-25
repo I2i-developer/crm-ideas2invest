@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
+import { parseReportDate } from "@/lib/crm/sipReports";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,28 @@ function matchesSearch(event, search) {
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(needle));
+}
+
+function rawValue(rawRow, candidates) {
+  if (!rawRow) return null;
+  const normalizedCandidates = candidates.map((candidate) =>
+    String(candidate).replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+  );
+  const entry = Object.entries(rawRow).find(([key, value]) =>
+    value !== null &&
+    value !== undefined &&
+    normalizedCandidates.includes(String(key).replace(/[^a-zA-Z0-9]/g, "").toUpperCase())
+  );
+  return entry ? entry[1] : null;
+}
+
+function correctedEventDates(event) {
+  return {
+    start_date: parseReportDate(rawValue(event.raw_row, ["STARTDATE"])) || event.start_date,
+    end_date: parseReportDate(rawValue(event.raw_row, ["ENDDATE"])) || event.end_date,
+    termination_date: parseReportDate(rawValue(event.raw_row, ["TERMDATE"])) || event.termination_date,
+    sip_registration_date: parseReportDate(rawValue(event.raw_row, ["SIPREGDT"])) || event.sip_registration_date,
+  };
 }
 
 function filterVisibleEvents(events, admin) {
@@ -104,8 +127,6 @@ export async function GET(request) {
   if (clientId) query = query.eq("client_id", clientId);
   if (fund) query = query.ilike("fund", `%${fund}%`);
   if (scheme) query = query.ilike("scheme", `%${scheme}%`);
-  if (dateFrom) query = query.gte("termination_date", dateFrom);
-  if (dateTo) query = query.lte("termination_date", dateTo);
   if (admin && assignedUser && assignedUser !== "all") query = query.eq("assigned_to", assignedUser);
 
   const { data, error } = await query.limit(clientId ? 50 : 500);
@@ -113,7 +134,14 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  let events = filterVisibleEvents(data || [], admin).filter((event) => matchesSearch(event, search));
+  let events = filterVisibleEvents(data || [], admin).map((event) => ({
+    ...event,
+    ...correctedEventDates(event),
+  }));
+
+  if (dateFrom) events = events.filter((event) => event.termination_date && event.termination_date >= dateFrom);
+  if (dateTo) events = events.filter((event) => event.termination_date && event.termination_date <= dateTo);
+  events = events.filter((event) => matchesSearch(event, search));
 
   const assigneeIds = [...new Set(events.map((event) => event.assigned_to).filter(Boolean))];
   const { data: profiles = [] } = assigneeIds.length

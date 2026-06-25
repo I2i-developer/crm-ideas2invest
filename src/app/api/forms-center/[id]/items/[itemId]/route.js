@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -19,7 +19,9 @@ export async function PUT(request, { params }) {
   const { id, itemId } = await params;
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { data: existing } = await db
     .from("forms_information_items")

@@ -36,7 +36,7 @@ export function isOperations(role) {
 }
 
 export function canManageClients(role) {
-  return isAdmin(role);
+  return isAdmin(role) || isOperations(role);
 }
 
 export function canManageUsers(role) {

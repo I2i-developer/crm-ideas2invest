@@ -346,7 +346,12 @@ export default function NewClientPage() {
     setSaving(true);
 
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: profileData } = userData?.user?.id
+        ? await supabase.from("profiles").select("role").eq("id", userData.user.id).maybeSingle()
+        : { data: null };
       const primaryHolder = holders.find((holder) => holder.holder_type === "primary") || {};
+      const isOperationsUser = profileData?.role === "operations";
 
       const clientPayload = {
         tax_status: client.tax_status,
@@ -392,6 +397,9 @@ export default function NewClientPage() {
         nominee_mobile: activeNominees[0]?.mobile || null,
         onboarding_status: "Draft",
         onboarding_completed_at: null,
+        operations_owner: isOperationsUser ? userData.user.id : null,
+        created_by: userData?.user?.id || null,
+        updated_by: userData?.user?.id || null,
       };
 
       const { data: createdClient, error: clientError } = await supabase

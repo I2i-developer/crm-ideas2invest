@@ -20,6 +20,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(false);
   const [currentRole, setCurrentRole] = useState(null);
   const isAdmin = currentRole === "admin";
+  const canAddClient = currentRole === "admin" || currentRole === "operations";
 
   function handleDelete(id) {
     if (!isAdmin) return;
@@ -103,7 +104,7 @@ export default function ClientsPage() {
         title="Clients"
         description="Manage and track all registered clients."
         icon={Users}
-        actions={isAdmin && (
+        actions={canAddClient && (
           <Link
             href="/admin/clients/new"
             className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50"

@@ -21,14 +21,12 @@ export async function GET(request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let query = supabase
+  const query = supabase
     .from("operation_notes")
     .select("*")
     .eq("archived", false)
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
-
-  query = query.eq("created_by", user.id);
 
   const { data: notes, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -47,6 +45,7 @@ export async function GET(request) {
       created_by_name: note.creator_name || profileMap.get(note.created_by) || "Operations user",
     })),
     role,
+    current_user_id: user.id,
   });
 }
 

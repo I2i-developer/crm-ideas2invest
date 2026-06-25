@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -27,7 +27,9 @@ export async function PUT(request, { params }) {
   const { id } = await params;
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { data: existing } = await db.from("forms_information_links").select("*").eq("id", id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Forms link not found" }, { status: 404 });
@@ -40,6 +42,7 @@ export async function PUT(request, { params }) {
       ? body.organization_type
       : existing.organization_type,
     forms_url: String(body.forms_url ?? existing.forms_url).trim(),
+    factsheet_url: String(body.factsheet_url ?? existing.factsheet_url ?? "").trim() || null,
     description: String(body.description ?? existing.description ?? "").trim() || null,
     active: body.active === undefined ? existing.active : Boolean(body.active),
     display_order: body.display_order === undefined ? existing.display_order : Number(body.display_order) || 0,
@@ -49,6 +52,9 @@ export async function PUT(request, { params }) {
 
   if (!payload.display_name || !payload.slug || !validExternalUrl(payload.forms_url)) {
     return NextResponse.json({ error: "Name, slug, and a valid external URL are required" }, { status: 400 });
+  }
+  if (payload.factsheet_url && !validExternalUrl(payload.factsheet_url)) {
+    return NextResponse.json({ error: "Factsheet URL must be a valid HTTP or HTTPS URL" }, { status: 400 });
   }
 
   const { data, error } = await db

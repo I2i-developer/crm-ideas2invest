@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, Edit3, Plus, Search, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, Edit3, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
@@ -124,8 +124,11 @@ function DoneByNameList({ names, inputValue, onInputChange, onAdd, onRemove }) {
 export default function MyWorkTrackerPage() {
   const [tasks, setTasks] = useState([]);
   const [role, setRole] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [doneByName, setDoneByName] = useState("");
   const [editingTask, setEditingTask] = useState(null);
@@ -139,8 +142,13 @@ export default function MyWorkTrackerPage() {
     date_from: "",
     date_to: "",
   });
+  const importFormRef = useRef(null);
 
   const operationsUser = role === "operations";
+  const canMutateTask = useCallback(
+    (task) => role === "admin" || task.created_by === currentUserId,
+    [currentUserId, role]
+  );
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -154,6 +162,7 @@ export default function MyWorkTrackerPage() {
       if (!response.ok) throw new Error(data.error || "Unable to load work tracker");
       setTasks(data.tasks || []);
       setRole(data.role || "");
+      setCurrentUserId(data.current_user_id || "");
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -194,6 +203,10 @@ export default function MyWorkTrackerPage() {
   }
 
   function editTask(task) {
+    if (!canMutateTask(task)) {
+      toast.error("Only the entry owner can edit this work entry");
+      return;
+    }
     setEditingTask(task);
     setFormExpanded(true);
     setForm({
@@ -238,6 +251,10 @@ export default function MyWorkTrackerPage() {
   }
 
   async function updateStatus(task, status) {
+    if (!canMutateTask(task)) {
+      toast.error("Only the entry owner can update this work entry");
+      return;
+    }
     const response = await authFetch(`/api/operations/self-tasks/${task.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -266,6 +283,38 @@ export default function MyWorkTrackerPage() {
       toast.error(error.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function importWorkEntries(event) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const file = formElement.elements?.file?.files?.[0];
+    if (!file) {
+      toast.error("Please choose an Excel or CSV file");
+      return;
+    }
+
+    setImporting(true);
+    setImportSummary(null);
+    try {
+      const payload = new FormData();
+      payload.append("file", file);
+      const response = await authFetch("/api/operations/self-tasks/import", {
+        method: "POST",
+        body: payload,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Unable to import work tracker file");
+
+      setImportSummary(data);
+      importFormRef.current?.reset();
+      toast.success(`Imported ${data.imported_rows || 0} work entries`);
+      await loadTasks();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -298,59 +347,99 @@ export default function MyWorkTrackerPage() {
       </section>
 
       {operationsUser && (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <button
-            type="button"
-            onClick={() => {
-              if (formExpanded && editingTask) resetForm();
-              else setFormExpanded((current) => !current);
-            }}
-            className="flex w-full items-center justify-between gap-4 p-4 text-left transition hover:bg-slate-50 sm:p-5"
-            aria-expanded={formExpanded}
-          >
-            <span className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                {editingTask ? <Edit3 size={18} /> : <Plus size={18} />}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-base font-semibold text-slate-950">
-                  {editingTask ? "Edit work entry" : "Add work entry"}
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                if (formExpanded && editingTask) resetForm();
+                else setFormExpanded((current) => !current);
+              }}
+              className="flex w-full items-center justify-between gap-4 p-4 text-left transition hover:bg-slate-50 sm:p-5"
+              aria-expanded={formExpanded}
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  {editingTask ? <Edit3 size={18} /> : <Plus size={18} />}
                 </span>
-                <span className="block truncate text-xs text-slate-500">
-                  {formExpanded ? "Complete the details below." : "Expand to record your daily work."}
+                <span className="min-w-0">
+                  <span className="block text-base font-semibold text-slate-950">
+                    {editingTask ? "Edit work entry" : "Add work entry"}
+                  </span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {formExpanded ? "Complete the details below." : "Expand to record your daily work."}
+                  </span>
                 </span>
               </span>
-            </span>
-            <ChevronDown size={19} className={`shrink-0 text-slate-500 transition-transform ${formExpanded ? "rotate-180" : ""}`} />
-          </button>
+              <ChevronDown size={19} className={`shrink-0 text-slate-500 transition-transform ${formExpanded ? "rotate-180" : ""}`} />
+            </button>
 
-          {formExpanded && (
-            <form onSubmit={saveTask} className="border-t border-slate-200 p-4 sm:p-5">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <FormInput label="Client name" name="client_name" value={form.client_name} onValueChange={(value) => setForm((current) => ({ ...current, client_name: value }))} />
-                <FormInput label="Date" name="task_date" type="date" required value={form.task_date} onValueChange={(value) => setForm((current) => ({ ...current, task_date: value }))} />
-                <FormInput label="Task/work description" name="task_description" required multiline rows={2} value={form.task_description} onValueChange={(value) => setForm((current) => ({ ...current, task_description: value }))} />
-                <FormInput label="Remark" name="remark" multiline rows={2} value={form.remark} onValueChange={(value) => setForm((current) => ({ ...current, remark: value }))} />
-                <FormSelect label="Status" name="status" options={STATUSES} value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))} />
-                <DoneByNameList
-                  names={form.done_by_ids}
-                  inputValue={doneByName}
-                  onInputChange={setDoneByName}
-                  onAdd={addDoneByName}
-                  onRemove={removeDoneByName}
+            {formExpanded && (
+              <form onSubmit={saveTask} className="border-t border-slate-200 p-4 sm:p-5">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <FormInput label="Client name" name="client_name" value={form.client_name} onValueChange={(value) => setForm((current) => ({ ...current, client_name: value }))} />
+                  <FormInput label="Date" name="task_date" type="date" required value={form.task_date} onValueChange={(value) => setForm((current) => ({ ...current, task_date: value }))} />
+                  <FormInput label="Task/work description" name="task_description" required multiline rows={2} value={form.task_description} onValueChange={(value) => setForm((current) => ({ ...current, task_description: value }))} />
+                  <FormInput label="Remark" name="remark" multiline rows={2} value={form.remark} onValueChange={(value) => setForm((current) => ({ ...current, remark: value }))} />
+                  <FormSelect label="Status" name="status" options={STATUSES} value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))} />
+                  <DoneByNameList
+                    names={form.done_by_ids}
+                    inputValue={doneByName}
+                    onInputChange={setDoneByName}
+                    onAdd={addDoneByName}
+                    onRemove={removeDoneByName}
+                  />
+                </div>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button type="button" onClick={resetForm} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:text-red-500">
+                    <X size={15} /> Cancel
+                  </button>
+                  <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">
+                    {saving ? "Saving..." : editingTask ? "Update entry" : "Add entry"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/60 to-emerald-50/50 p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm">
+                  <FileSpreadsheet size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-slate-950">Import previous work tracker sheet</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Upload an Excel or CSV exported from Google Sheets. Columns such as Date, Client, Task, Remarks, Done by, and Status are detected automatically.
+                  </p>
+                  {importSummary && (
+                    <p className="mt-2 text-xs font-semibold text-slate-600">
+                      Imported {importSummary.imported_rows || 0} of {importSummary.total_rows || 0} rows
+                      {importSummary.failed_rows ? `, ${importSummary.failed_rows} failed` : ""}.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <form ref={importFormRef} onSubmit={importWorkEntries} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="file"
+                  name="file"
+                  accept=".xlsx,.xls,.csv,.txt"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 sm:w-72"
                 />
-              </div>
-              <div className="mt-5 flex justify-end gap-3">
-                <button type="button" onClick={resetForm} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:text-red-500">
-                  <X size={15} /> Cancel
+                <button
+                  type="submit"
+                  disabled={importing}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  <Upload size={16} />
+                  {importing ? "Importing..." : "Import"}
                 </button>
-                <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">
-                  {saving ? "Saving..." : editingTask ? "Update entry" : "Add entry"}
-                </button>
-              </div>
-            </form>
-          )}
-        </section>
+              </form>
+            </div>
+          </section>
+        </div>
       )}
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -379,6 +468,7 @@ export default function MyWorkTrackerPage() {
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Work</th>
+                <th className="px-4 py-3">Remarks</th>
                 <th className="px-4 py-3">Done by</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -386,16 +476,18 @@ export default function MyWorkTrackerPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">Loading work tracker...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">Loading work tracker...</td></tr>
               ) : tasks.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">No self work entries found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No self work entries found.</td></tr>
               ) : tasks.map((task) => (
                 <tr key={task.id} className="align-top transition hover:bg-blue-50/30">
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(task.task_date)}</td>
                   <td className="px-4 py-3 font-semibold text-slate-800">{task.client_name || "-"}</td>
                   <td className="max-w-md px-4 py-3">
                     <p className="font-medium text-slate-900">{task.task_description}</p>
-                    {task.remark && <p className="mt-1 text-xs leading-5 text-slate-500">{task.remark}</p>}
+                  </td>
+                  <td className="max-w-sm px-4 py-3 text-sm leading-5 text-slate-600">
+                    {task.remark || <span className="text-slate-400">-</span>}
                   </td>
                   <td className="px-4 py-3">
                     <DoneByChips names={task.done_by} />
@@ -407,23 +499,27 @@ export default function MyWorkTrackerPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      {task.status !== "Done" && (
+                      {canMutateTask(task) && task.status !== "Done" && (
                         <CrmTooltip content="Mark done">
                           <button type="button" onClick={() => updateStatus(task, "Done")} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <CheckCircle2 size={16} />
                           </button>
                         </CrmTooltip>
                       )}
-                      <CrmTooltip content="Edit entry">
-                        <button type="button" onClick={() => editTask(task)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700">
-                          <Edit3 size={16} />
-                        </button>
-                      </CrmTooltip>
-                      <CrmTooltip content="Archive entry">
-                        <button type="button" onClick={() => setDeleteTarget(task)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700">
-                          <Trash2 size={16} />
-                        </button>
-                      </CrmTooltip>
+                      {canMutateTask(task) && (
+                        <>
+                          <CrmTooltip content="Edit entry">
+                            <button type="button" onClick={() => editTask(task)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700">
+                              <Edit3 size={16} />
+                            </button>
+                          </CrmTooltip>
+                          <CrmTooltip content="Archive entry">
+                            <button type="button" onClick={() => setDeleteTarget(task)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700">
+                              <Trash2 size={16} />
+                            </button>
+                          </CrmTooltip>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

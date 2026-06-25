@@ -28,6 +28,7 @@ function buildLinkPayload(body, userId) {
       ? body.organization_type
       : "AMC",
     forms_url: String(body.forms_url || "").trim(),
+    factsheet_url: String(body.factsheet_url || "").trim() || null,
     description: String(body.description || "").trim() || null,
     active: body.active !== false,
     display_order: Number(body.display_order) || 0,
@@ -93,7 +94,9 @@ export async function POST(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await request.json();
   const payload = { ...buildLinkPayload(body, user.id), created_by: user.id };
@@ -102,6 +105,9 @@ export async function POST(request) {
   }
   if (!validExternalUrl(payload.forms_url)) {
     return NextResponse.json({ error: "A valid HTTP or HTTPS forms URL is required" }, { status: 400 });
+  }
+  if (payload.factsheet_url && !validExternalUrl(payload.factsheet_url)) {
+    return NextResponse.json({ error: "Factsheet URL must be a valid HTTP or HTTPS URL" }, { status: 400 });
   }
 
   const { data, error } = await db.from("forms_information_links").insert(payload).select().single();

@@ -83,35 +83,66 @@ function excelSerialToDate(serial) {
   return new Date(excelEpoch + Number(serial) * 86400000);
 }
 
+function dateKeyFromDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function validDateParts(year, month, day) {
+  if (!year || !month || !day || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function dateKeyFromParts(year, month, day) {
+  if (!validDateParts(year, month, day)) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function parseReportDate(value) {
   if (!value) return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    return dateKeyFromDate(value);
   }
   if (typeof value === "number" && Number.isFinite(value)) {
-    return excelSerialToDate(value).toISOString().slice(0, 10);
+    return dateKeyFromDate(excelSerialToDate(value));
   }
 
   const text = String(value).trim();
   if (!text) return null;
 
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    if (Number.isFinite(serial) && serial > 20000 && serial < 90000) {
+      return dateKeyFromDate(excelSerialToDate(serial));
+    }
+  }
+
   const iso = Date.parse(text);
   if (!Number.isNaN(iso) && /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(text)) {
-    return new Date(iso).toISOString().slice(0, 10);
+    return dateKeyFromDate(new Date(iso));
   }
 
   const match = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (match) {
-    const [, dayText, monthText, yearText] = match;
+    const [, firstText, secondText, yearText] = match;
     const year = Number(yearText.length === 2 ? `20${yearText}` : yearText);
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+    const first = Number(firstText);
+    const second = Number(secondText);
+    const candidates = second > 12 && first <= 12
+      ? [[year, first, second], [year, second, first]]
+      : [[year, second, first], [year, first, second]];
+    for (const [candidateYear, candidateMonth, candidateDay] of candidates) {
+      const parsed = dateKeyFromParts(candidateYear, candidateMonth, candidateDay);
+      if (parsed) return parsed;
+    }
   }
 
   const fallback = new Date(text);
-  return Number.isNaN(fallback.getTime()) ? null : fallback.toISOString().slice(0, 10);
+  return Number.isNaN(fallback.getTime()) ? null : dateKeyFromDate(fallback);
 }
 
 function inferEventType(row) {
@@ -215,7 +246,7 @@ export async function parseSipReportFile({ buffer, fileName }) {
   const workbook = XLSX.read(buffer, {
     type: "buffer",
     cellDates: true,
-    raw: false,
+    raw: true,
   });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in uploaded file.");
@@ -225,7 +256,7 @@ export async function parseSipReportFile({ buffer, fileName }) {
     header: 1,
     defval: null,
     blankrows: false,
-    raw: false,
+    raw: true,
   });
   const rows = buildRowsFromHeaderMatrix(matrix);
   if (!rows.length) throw new Error("Uploaded SIP report is empty.");
