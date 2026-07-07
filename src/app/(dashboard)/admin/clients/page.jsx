@@ -107,6 +107,10 @@ export default function ClientsPage() {
         actions={canAddClient && (
           <Link
             href="/admin/clients/new"
+            onClick={(event) => {
+              event.preventDefault();
+              window.location.assign("/admin/clients/new");
+            }}
             className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50"
           >
             + New Client
