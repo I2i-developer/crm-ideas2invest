@@ -51,7 +51,7 @@ function summarizeBy(items, key) {
 export async function GET(request) {
   const supabase = await createClient(request);
   const taskDb = getTaskDataClient(supabase);
-  const { user, role } = await getAuthContext(supabase);
+  const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -225,6 +225,12 @@ export async function GET(request) {
 
   return NextResponse.json({
     role,
+    current_user: {
+      id: user.id,
+      name: profile?.name || profile?.full_name || user.user_metadata?.full_name || user.email || "CRM User",
+      email: profile?.email || user.email || "",
+      role,
+    },
     admin_ids: adminIds,
     metrics: {
       total_clients: clientsRes.data?.length || 0,

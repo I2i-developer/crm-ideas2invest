@@ -44,6 +44,18 @@ function List({ title, items, empty, render }) {
   );
 }
 
+function greetingForNow() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
+function displayUserName(data) {
+  const name = data?.current_user?.name || "User";
+  return String(name).includes("@") ? String(name).split("@")[0] : name;
+}
+
 export default function OperationsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +101,7 @@ export default function OperationsDashboard() {
     <div className="p-6 space-y-6">
       <PageHeader
         eyebrow="Operations workspace"
-        title="Operations Dashboard"
+        title={`${greetingForNow()}, ${displayUserName(data)}`}
         description="Your assigned work, alerts, document actions, and client birthdays."
         icon={ClipboardList}
       />
