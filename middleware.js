@@ -58,7 +58,6 @@ export async function middleware(request) {
     }
     const isOperationsAllowedClientPage =
       pathname.startsWith('/admin/clients') &&
-      !pathname.endsWith('/new') &&
       !pathname.includes('/edit')
     const isOperationsAllowedAdminPage =
       isOperationsAllowedClientPage ||

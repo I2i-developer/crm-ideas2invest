@@ -241,6 +241,15 @@ function isActiveRoute(currentPath, itemPath, matchType = "section") {
   return normalizedCurrent === normalizedItem || normalizedCurrent.startsWith(`${normalizedItem}/`);
 }
 
+function isSupabaseLockAbort(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("lock broken") || message.includes("aborterror");
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, setMobileOpen }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -293,32 +302,44 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
   });
 
   const fetchUserProfile = useCallback(async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
+    let lastError = null;
 
-    const user = sessionData?.session?.user;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
 
-    if (!user) {
-      router.push("/login");
-      return;
+        const user = sessionData?.session?.user;
+
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("name, designation, avatar_url, role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        setUserData({
+          name: data?.name || user.email || "CRM User",
+          designation: data?.designation || "",
+          avatar: data?.avatar_url || "/images/profiles/default.png",
+          role: data?.role || "",
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+        if (!isSupabaseLockAbort(error) || attempt === 2) break;
+        await wait(150 * (attempt + 1));
+      }
     }
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("name, designation, avatar_url, role")
-      .eq("id", user.id)
-      .single();
-
-    if (error) {
-      console.error("Error fetching profile:", error.message);
-      return;
-    }
-
-    setUserData({
-      name: data.name,
-      designation: data.designation,
-      avatar: data.avatar_url || "/images/profiles/default.png",
-      role: data.role,
-    });
+    if (isSupabaseLockAbort(lastError)) return;
+    console.error("Error fetching profile:", lastError?.message || lastError);
   }, [router]);
 
   useEffect(() => {
