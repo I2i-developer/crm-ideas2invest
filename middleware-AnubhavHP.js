@@ -58,14 +58,12 @@ export async function middleware(request) {
     }
     const isOperationsAllowedClientPage =
       pathname.startsWith('/admin/clients') &&
-      !pathname.endsWith('/new') &&
       !pathname.includes('/edit')
     const isOperationsAllowedAdminPage =
       isOperationsAllowedClientPage ||
       pathname.startsWith('/admin/birthdays') ||
       pathname.startsWith('/admin/document-requirements') ||
       pathname.startsWith('/admin/calculators') ||
-      pathname.startsWith('/admin/kyc-status') ||
       pathname.startsWith('/admin/risk-profiling') ||
       pathname.startsWith('/admin/insurance') ||
       pathname.startsWith('/admin/tasks') ||

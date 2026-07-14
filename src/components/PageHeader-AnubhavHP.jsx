@@ -14,7 +14,7 @@ export default function PageHeader({
     amber: "border-amber-100 bg-gradient-to-br from-white via-amber-50 to-orange-50",
   };
   const eyebrowTones = {
-    default: "text-grey-400",
+    default: "text-blue-700",
     blue: "text-blue-700",
     emerald: "text-emerald-700",
     amber: "text-amber-700",

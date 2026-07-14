@@ -56,6 +56,15 @@ function displayUserName(data) {
   return String(name).includes("@") ? String(name).split("@")[0] : name;
 }
 
+function GreetingTitle({ data }) {
+  return (
+    <>
+      <span className="text-blue-700">{greetingForNow()},</span>{" "}
+      <span className="text-emerald-700">{displayUserName(data)}</span>
+    </>
+  );
+}
+
 export default function OperationsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +110,7 @@ export default function OperationsDashboard() {
     <div className="p-6 space-y-6">
       <PageHeader
         eyebrow="Operations workspace"
-        title={`${greetingForNow()}, ${displayUserName(data)}`}
+        title={<GreetingTitle data={data} />}
         description="Your assigned work, alerts, document actions, and client birthdays."
         icon={ClipboardList}
       />

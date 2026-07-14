@@ -34,6 +34,27 @@ async function generateBirthdayNotifications(request, supabase, userId) {
   }
 }
 
+async function generateKycStatusReminder(supabase, userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { count, error } = await supabase
+    .from("client_kyc_statuses")
+    .select("*", { count: "exact", head: true })
+    .eq("kyc_status", "Not Checked");
+
+  if (error || !count) return;
+
+  await createNotification(supabase, {
+    userId,
+    title: "KYC status reminder",
+    message: `${count} client${count === 1 ? " has" : "s have"} KYC status not checked.`,
+    type: "kyc_status_unchecked",
+    entityType: "client_kyc_status",
+    linkUrl: "/admin/kyc-status?status=Not%20Checked",
+    metadata: { unchecked_count: count, reminder_date: today },
+    dedupeKey: `kyc_status_unchecked:${userId}:${today}`,
+  });
+}
+
 export async function GET(request) {
   const supabase = await createClient(request);
   const notificationDb = getTaskDataClient(supabase);
@@ -48,6 +69,7 @@ export async function GET(request) {
   await generateTaskDateNotifications(supabase, user.id);
   await generateInsuranceRenewalNotifications(supabase, user.id);
   await generateBirthdayNotifications(request, supabase, user.id);
+  await generateKycStatusReminder(supabase, user.id);
 
   let notificationsQuery = notificationDb
     .from("task_notifications")

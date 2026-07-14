@@ -63,6 +63,15 @@ function displayUserName(data) {
   return String(name).includes("@") ? String(name).split("@")[0] : name;
 }
 
+function GreetingTitle({ data }) {
+  return (
+    <>
+      <span className="text-emerald-300">{greetingForNow()},</span>{" "}
+      <span className="text-blue-700">{displayUserName(data)}</span>
+    </>
+  );
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +116,7 @@ export default function AdminDashboard() {
     <div className="p-6 space-y-6">
       <PageHeader
         eyebrow="Admin workspace"
-        title={`${greetingForNow()}, ${displayUserName(data)}`}
+        title={<GreetingTitle data={data} />}
         description="Operational overview across clients, documents, tasks, and birthdays."
         icon={Users}
       />
