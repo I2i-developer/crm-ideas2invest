@@ -51,6 +51,18 @@ function ListCard({ title, items, empty, renderItem }) {
   );
 }
 
+function greetingForNow() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
+function displayUserName(data) {
+  const name = data?.current_user?.name || "User";
+  return String(name).includes("@") ? String(name).split("@")[0] : name;
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +107,7 @@ export default function AdminDashboard() {
     <div className="p-6 space-y-6">
       <PageHeader
         eyebrow="Admin workspace"
-        title="Admin Dashboard"
+        title={`${greetingForNow()}, ${displayUserName(data)}`}
         description="Operational overview across clients, documents, tasks, and birthdays."
         icon={Users}
       />
