@@ -55,7 +55,7 @@ async function generateKycStatusReminder(supabase, userId) {
 }
 
 function isRetiredInsuranceNotification(notification) {
-  const type = String(notification.notification_type || notification.type || "").toLowerCase();
+  const type = String(notification.notification_type || "").toLowerCase();
   const entityType = String(notification.entity_type || "").toLowerCase();
   const linkUrl = String(notification.link_url || "").toLowerCase();
 
@@ -101,7 +101,7 @@ export async function GET(request) {
 
   const { data: unreadRows, error: unreadError } = await notificationDb
     .from("task_notifications")
-    .select("id, notification_type, type, entity_type, link_url")
+    .select("id, notification_type, entity_type, link_url")
     .eq("user_id", user.id)
     .or("notification_type.is.null,notification_type.neq.upcoming_birthday")
     .eq("is_read", false);

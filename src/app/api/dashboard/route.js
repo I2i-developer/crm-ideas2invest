@@ -47,7 +47,7 @@ function summarizeBy(items, key) {
 }
 
 function isRetiredInsuranceNotification(notification) {
-  const type = String(notification.notification_type || notification.type || "").toLowerCase();
+  const type = String(notification.notification_type || "").toLowerCase();
   const entityType = String(notification.entity_type || "").toLowerCase();
   const linkUrl = String(notification.link_url || "").toLowerCase();
 
