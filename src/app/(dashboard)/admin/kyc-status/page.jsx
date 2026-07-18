@@ -9,11 +9,11 @@ import {
   Loader2,
   Pencil,
   Plus,
-  RefreshCw,
   Save,
   Search,
   ShieldCheck,
   ShieldQuestion,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -24,6 +24,7 @@ import { authFetch } from "@/lib/authFetch";
 import FormInput from "../clients/components/FormInput";
 import FormSelect from "../clients/components/FormSelect";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const KYC_STATUSES = ["Not Checked", "KYC Validated", "KYC Registered", "KYC On-Hold", "KYC Rejected"];
 const STATUS_OPTIONS = KYC_STATUSES.map((status) => ({ value: status, label: status }));
@@ -84,11 +85,14 @@ export default function KycStatusPage() {
   const [filters, setFilters] = useState({ search: "", status: "" });
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [recordToDelete, setRecordToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 25;
 
   const canManageKycRecords = role === "admin" || role === "operations";
+  const canDeleteKycRecords = role === "admin";
 
   const totalPages = Math.max(1, Math.ceil(records.length / rowsPerPage));
   const paginatedRecords = useMemo(
@@ -120,8 +124,15 @@ export default function KycStatusPage() {
     const params = new URLSearchParams(window.location.search);
     const nextFilters = { search: "", status: params.get("status") || "" };
     setFilters(nextFilters);
-    loadRecords(nextFilters);
-  }, [loadRecords]);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadRecords(filters);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [filters, loadRecords]);
 
   function resetForm() {
     setForm(emptyForm);
@@ -164,7 +175,7 @@ export default function KycStatusPage() {
     if (!response.ok) return toast.error(data.error || "Failed to save KYC status");
     toast.success(editingId ? "KYC status updated" : "KYC status added");
     resetForm();
-    await loadRecords();
+    await loadRecords(filters);
   }
 
   async function quickStatusUpdate(record, status) {
@@ -214,7 +225,21 @@ export default function KycStatusPage() {
     }
     setImportSummary(data);
     toast.success(`Imported ${data.successful_rows} PAN record${data.successful_rows === 1 ? "" : "s"}`);
-    await loadRecords();
+    await loadRecords(filters);
+  }
+
+  async function deleteRecord() {
+    if (!recordToDelete || !canDeleteKycRecords) return;
+    setDeleting(true);
+    const response = await authFetch(`/api/kyc-statuses/${recordToDelete.id}`, {
+      method: "DELETE",
+    });
+    const data = await response.json().catch(() => ({}));
+    setDeleting(false);
+    if (!response.ok) return toast.error(data.error || "Failed to delete KYC record");
+    toast.success("KYC record deleted");
+    setRecordToDelete(null);
+    await loadRecords(filters);
   }
 
   function exportRecords() {
@@ -311,13 +336,6 @@ export default function KycStatusPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => loadRecords(filters)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              <RefreshCw size={16} /> Apply
-            </button>
             <button
               type="button"
               onClick={exportRecords}
@@ -464,15 +482,26 @@ export default function KycStatusPage() {
                         <span className="line-clamp-2">{record.remarks || "-"}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {canManageKycRecords && (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(record)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <Pencil size={14} /> Edit
-                          </button>
-                        )}
+                        <div className="flex justify-end gap-2">
+                          {canManageKycRecords && (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(record)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              <Pencil size={14} /> Edit
+                            </button>
+                          )}
+                          {canDeleteKycRecords && (
+                            <button
+                              type="button"
+                              onClick={() => setRecordToDelete(record)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-100"
+                            >
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -504,6 +533,16 @@ export default function KycStatusPage() {
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(recordToDelete)}
+        title="Delete KYC record?"
+        message={`This will permanently delete ${recordToDelete?.client_name || "this KYC record"} from the tracker.`}
+        confirmLabel="Delete Record"
+        loading={deleting}
+        onConfirm={deleteRecord}
+        onCancel={() => setRecordToDelete(null)}
+      />
     </main>
   );
 }
