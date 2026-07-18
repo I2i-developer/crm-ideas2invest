@@ -5,7 +5,7 @@ const siteUrl =
 
 const title = "Ideas2Invest CRM";
 const description =
-  "Sign in to the Ideas2Invest CRM for client onboarding, documents, tasks, SIP tracking, insurance renewals, and team operations.";
+  "Sign in to the Ideas2Invest CRM for client onboarding, documents, tasks, SIP tracking, KYC status, and team operations.";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),

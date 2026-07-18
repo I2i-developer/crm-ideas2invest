@@ -21,7 +21,6 @@ const DEFAULT_NOTIFICATIONS = {
   task_due_reminders: true,
   document_review: true,
   birthday_reminders: true,
-  insurance_renewals: true,
   sip_followups: true,
   real_time_toasts: true,
 };
@@ -61,11 +60,6 @@ export default function SettingsPage() {
         .order("imported_at", { ascending: false })
         .limit(8),
       supabase
-        .from("insurance_imports")
-        .select("id, file_name, source_type, imported_by, imported_at, import_status, total_rows, successful_rows, duplicate_rows, failed_rows, unmatched_rows")
-        .order("imported_at", { ascending: false })
-        .limit(8),
-      supabase
         .from("documents")
         .select("id, client_id, document_type, file_name, uploaded_by, uploaded_at, status")
         .order("uploaded_at", { ascending: false })
@@ -102,26 +96,7 @@ export default function SettingsPage() {
       });
     });
 
-    const insuranceImports = settled[1].status === "fulfilled" && !settled[1].value.error ? settled[1].value.data || [] : [];
-    insuranceImports.forEach((item) => {
-      addUploader(item.imported_by);
-      rows.push({
-        key: `insurance-${item.id}`,
-        type: "Insurance policy import",
-        fileName: item.file_name || "Manual insurance import",
-        uploadedBy: item.imported_by,
-        uploadedAt: item.imported_at,
-        totalRows: item.total_rows,
-        newRecords: item.successful_rows,
-        duplicates: item.duplicate_rows,
-        failedRows: item.failed_rows,
-        status: item.import_status,
-        sourceType: item.source_type || "manual_upload",
-        href: "/admin/insurance",
-      });
-    });
-
-    [settled[2], settled[3]].forEach((result, index) => {
+    [settled[1], settled[2]].forEach((result, index) => {
       const documents = result.status === "fulfilled" && !result.value.error ? result.value.data || [] : [];
       documents.forEach((item) => {
         addUploader(item.uploaded_by);
@@ -414,12 +389,6 @@ export default function SettingsPage() {
             description="Show client birthday reminders for the current day."
             checked={notifications.birthday_reminders}
             onChange={() => toggleNotification("birthday_reminders")}
-          />
-          <ToggleRow
-            label="Insurance renewals"
-            description="Notify me about renewal follow-ups and overdue insurance actions."
-            checked={notifications.insurance_renewals}
-            onChange={() => toggleNotification("insurance_renewals")}
           />
           <ToggleRow
             label="SIP follow-ups"

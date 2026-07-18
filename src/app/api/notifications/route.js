@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext } from "@/lib/auth/permissions";
 import { createNotification } from "@/lib/notifications/service";
 import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
-import { generateInsuranceRenewalNotifications } from "@/lib/insurance/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
 async function generateBirthdayNotifications(request, supabase, userId) {
@@ -55,6 +54,16 @@ async function generateKycStatusReminder(supabase, userId) {
   });
 }
 
+function isRetiredInsuranceNotification(notification) {
+  const type = String(notification.notification_type || notification.type || "").toLowerCase();
+  const entityType = String(notification.entity_type || "").toLowerCase();
+  const linkUrl = String(notification.link_url || "").toLowerCase();
+
+  return type.includes("insurance")
+    || entityType === "insurance_policy"
+    || linkUrl.includes("/admin/insurance");
+}
+
 export async function GET(request) {
   const supabase = await createClient(request);
   const notificationDb = getTaskDataClient(supabase);
@@ -67,7 +76,6 @@ export async function GET(request) {
   }
 
   await generateTaskDateNotifications(supabase, user.id);
-  await generateInsuranceRenewalNotifications(supabase, user.id);
   await generateBirthdayNotifications(request, supabase, user.id);
   await generateKycStatusReminder(supabase, user.id);
 
@@ -91,14 +99,21 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { count } = await notificationDb
+  const { data: unreadRows, error: unreadError } = await notificationDb
     .from("task_notifications")
-    .select("*", { count: "exact", head: true })
+    .select("id, notification_type, type, entity_type, link_url")
     .eq("user_id", user.id)
     .or("notification_type.is.null,notification_type.neq.upcoming_birthday")
     .eq("is_read", false);
 
-  return NextResponse.json({ notifications, unread_count: count || 0 }, { status: 200 });
+  if (unreadError) {
+    return NextResponse.json({ error: unreadError.message }, { status: 500 });
+  }
+
+  const visibleNotifications = (notifications || []).filter((notification) => !isRetiredInsuranceNotification(notification));
+  const unreadCount = (unreadRows || []).filter((notification) => !isRetiredInsuranceNotification(notification)).length;
+
+  return NextResponse.json({ notifications: visibleNotifications, unread_count: unreadCount }, { status: 200 });
 }
 
 export async function PUT(request) {

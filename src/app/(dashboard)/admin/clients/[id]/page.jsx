@@ -328,10 +328,6 @@ export default function ClientDetails() {
           <p className="text-sm text-gray-500">Risk Profiling</p>
           <p className="mt-1 text-lg font-semibold text-gray-900">{client.risk_category || "Pending assessment"}</p>
         </Link>
-        <Link href={`/admin/insurance?client_id=${id}`} className="glass-card p-5 hover:bg-white/70 transition">
-          <p className="text-sm text-gray-500">Insurance</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">{client.insurance_policy_type || client.has_insurance || "Not captured"}</p>
-        </Link>
       </div>
 
       {/* DOCUMENTS */}

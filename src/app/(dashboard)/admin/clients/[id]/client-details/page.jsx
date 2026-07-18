@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { authFetch } from "@/lib/authFetch";
-import { Copy, Check, ClipboardList, HeartPulse, PauseCircle } from "lucide-react";
+import { Copy, Check, ClipboardList, PauseCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
@@ -20,7 +20,6 @@ export default function CompleteClientInfo() {
   const [holders, setHolders] = useState([]);
   const [bankAccount, setBankAccount] = useState(null);
   const [riskAssessments, setRiskAssessments] = useState([]);
-  const [insurancePolicies, setInsurancePolicies] = useState([]);
   const [clientTasks, setClientTasks] = useState([]);
   const [sipEvents, setSipEvents] = useState([]);
   const [sessionParsedData, setSessionParsedData] = useState(null);
@@ -58,18 +57,15 @@ export default function CompleteClientInfo() {
 
   useEffect(() => {
     async function fetchClientModules() {
-      const [riskResponse, insuranceResponse, sipResponse] = await Promise.all([
+      const [riskResponse, sipResponse] = await Promise.all([
         authFetch(`/api/risk-profiling?client_id=${id}`),
-        authFetch(`/api/insurance?client_id=${id}`),
         authFetch(`/api/sip-reports?client_id=${id}`),
       ]);
 
       const riskData = await riskResponse.json().catch(() => ({}));
-      const insuranceData = await insuranceResponse.json().catch(() => ({}));
       const sipData = await sipResponse.json().catch(() => ({}));
 
       if (riskResponse.ok) setRiskAssessments(riskData.assessments || []);
-      if (insuranceResponse.ok) setInsurancePolicies(insuranceData.policies || []);
       if (sipResponse.ok) setSipEvents(sipData.events || []);
     }
 
@@ -261,7 +257,6 @@ export default function CompleteClientInfo() {
   const displayState = client.state || deriveState(parsed.address);
   const displayCity = client.city || deriveCity(parsed.address, displayState);
   const latestRiskAssessment = riskAssessments[0];
-  const latestInsurancePolicy = insurancePolicies[0];
   const openTasks = clientTasks.filter((task) => task.status !== "Completed");
   const overdueTasks = openTasks.filter((task) => task.due_date && task.due_date < new Date().toISOString().slice(0, 10));
 
@@ -276,25 +271,6 @@ export default function CompleteClientInfo() {
     };
     return styles[value] || "bg-slate-50 text-slate-700 border-slate-100";
   };
-  const insuranceStatusClass = (value) => {
-    const styles = {
-      Paid: "bg-green-50 text-green-700 border-green-100",
-      Pending: "bg-amber-50 text-amber-700 border-amber-100",
-      "Grace Period": "bg-blue-50 text-blue-700 border-blue-100",
-      Overdue: "bg-red-50 text-red-700 border-red-100",
-      Lapsed: "bg-slate-50 text-slate-700 border-slate-100",
-    };
-    return styles[value] || "bg-slate-50 text-slate-700 border-slate-100";
-  };
-  const formatCurrency = (value) => {
-    if (!value) return "-";
-    return Number(value).toLocaleString("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    });
-  };
-
   return (
     <div className="p-6 space-y-6">
 
@@ -324,15 +300,6 @@ export default function CompleteClientInfo() {
           </p>
           {latestRiskAssessment?.total_score !== undefined && (
             <p className="mt-1 text-xs text-gray-500">Score: {latestRiskAssessment.total_score}</p>
-          )}
-        </Link>
-        <Link href={`/admin/insurance?client_id=${id}`} className="glass-card p-5 hover:bg-white/70 transition">
-          <p className="text-sm text-gray-500">Insurance</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
-            {latestInsurancePolicy?.policy_type || client.insurance_policy_type || client.has_insurance || "Not captured"}
-          </p>
-          {(latestInsurancePolicy?.renewal_date || client.insurance_renewal_date) && (
-            <p className="mt-1 text-xs text-gray-500">Renewal: {formatDateDDMonYYYY(latestInsurancePolicy?.renewal_date || client.insurance_renewal_date, "-")}</p>
           )}
         </Link>
       </div>
@@ -404,50 +371,6 @@ export default function CompleteClientInfo() {
         {renderField("Account Type", bankAccount?.account_type || bankAccount?.nri_account_type, "account_type")}
         {renderField("IFSC", bankAccount?.ifsc_code, "ifsc_code")}
         {renderField("MICR", bankAccount?.micr_code, "micr_code")}
-      </Section>
-
-      <Section title="Insurance Policies" noGrid>
-        {insurancePolicies.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
-            No insurance policy records found.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {insurancePolicies.map((policy) => (
-              <div key={policy.id} className="rounded-xl border bg-gray-50 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${insuranceStatusClass(policy.computed_payment_status || policy.payment_status)}`}>
-                        {policy.computed_payment_status || policy.payment_status || "Pending"}
-                      </span>
-                      <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                        {policy.through_company ? "Through us" : "External"}
-                      </span>
-                    </div>
-                    <p className="font-semibold text-gray-900">{policy.policy_type || "Insurance Policy"}</p>
-                    <p className="text-sm text-gray-600">
-                      {policy.insurance_company || "-"} / Policy {policy.policy_number || "-"}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Premium {formatCurrency(policy.premium_amount)} / Due {formatDateDDMonYYYY(policy.due_date || policy.renewal_date, "-")}
-                    </p>
-                    {policy.remarks && <p className="text-sm text-gray-500">{policy.remarks}</p>}
-                  </div>
-                  <div className="flex flex-col items-start gap-2 text-sm md:items-end">
-                    <span className="inline-flex items-center gap-1 text-gray-500">
-                      <HeartPulse size={15} />
-                      Next follow-up {formatDateDDMonYYYY(policy.next_follow_up_date, "-")}
-                    </span>
-                    <Link href={`/admin/insurance?client_id=${id}`} className="font-medium text-blue-700 hover:underline">
-                      Open policy logs
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </Section>
 
       {/* PARSED DATA */}

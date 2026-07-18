@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Bell, CalendarClock, CalendarDays, CheckCircle2, FileText, ShieldQuestion, Umbrella, Users, UsersRound, UserRoundPlus, XCircle } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, CheckCircle2, FileText, ShieldQuestion, Users, UsersRound, UserRoundPlus, XCircle } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
@@ -98,7 +98,6 @@ export default function AdminDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, refreshDashboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "task_assignments" }, refreshDashboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "sip_events" }, refreshDashboard)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insurance_policies" }, refreshDashboard)
       .subscribe();
 
     return () => {
@@ -129,8 +128,6 @@ export default function AdminDashboard() {
         <StatCard title="Overdue Tasks" value={metrics.overdue_tasks || 0} href="/dashboard/tasks" icon={AlertTriangle} tone="red" />
         <StatCard title="Due Today" value={metrics.due_today_tasks || 0} href="/dashboard/tasks" icon={CalendarDays} tone="amber" />
         <StatCard title="Risk Pending" value={metrics.risk_profiling_pending || 0} href="/admin/risk-profiling" icon={ShieldQuestion} tone="violet" />
-        <StatCard title="Insurance Due 30 Days" value={metrics.insurance_due_next_30 || 0} href="/admin/insurance" icon={CalendarClock} tone="blue" />
-        {/* <StatCard title="Pending Renewals" value={metrics.insurance_pending_renewals || 0} href="/admin/insurance" icon={Umbrella} tone="amber" /> */}
         <StatCard title="SIP Terminated" value={metrics.sip_terminated_total || 0} href="/admin/sip-tracker?event_type=terminated" icon={XCircle} tone="red" />
         <StatCard title="SIP Rejected" value={metrics.sip_rejected_total || 0} href="/admin/sip-tracker?event_type=rejected" icon={AlertTriangle} tone="violet" />
       </div>

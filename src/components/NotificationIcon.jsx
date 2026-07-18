@@ -124,15 +124,6 @@ export default function NotificationIcon() {
       );
     }
 
-    if (notification.notification_type?.startsWith("insurance_renewal") && notification.metadata?.client_name) {
-      return (
-        <>
-          <span className="font-semibold text-blue-700">{notification.metadata.client_name}</span>
-          <span>{notification.message?.replace(notification.metadata.client_name, "")}</span>
-        </>
-      );
-    }
-
     return notification.message;
   }
 

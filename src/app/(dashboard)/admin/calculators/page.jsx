@@ -6,7 +6,6 @@ import {
   Calculator,
   Download,
   Flag,
-  HeartPulse,
   IndianRupee,
   Landmark,
   LineChart,
@@ -42,7 +41,6 @@ const CALCULATORS = [
   { id: "swp", name: "SWP Calculator", category: "Withdrawal", icon: IndianRupee },
   { id: "stp", name: "STP Calculator", category: "Transfer", icon: ArrowRightLeft },
   { id: "mutual-ace", name: "Mutual + Ace Calculator", category: "Advanced", icon: TrendingUp },
-  { id: "insurance-need", name: "Insurance Need Calculator", category: "Insurance", icon: HeartPulse },
 ];
 
 const DEFAULTS = {
@@ -55,7 +53,6 @@ const DEFAULTS = {
   swp: { corpus: 5000000, monthlyWithdrawal: 40000, returnRate: 8, years: 15 },
   stp: { corpus: 1200000, monthlyTransfer: 50000, sourceReturn: 6, targetReturn: 12, months: 24 },
   "mutual-ace": { existingCorpus: 500000, monthly: 15000, annualStepUp: 10, lumpsum: 200000, returnRate: 13, years: 15 },
-  "insurance-need": { annualExpense: 1200000, liabilities: 2500000, goals: 3000000, existingCover: 1000000, existingAssets: 1500000, yearsSupport: 15, inflation: 6, returnRate: 8 },
 };
 
 function currency(value) {
@@ -120,7 +117,6 @@ const RETURN_KEYS = {
   swp: ["returnRate"],
   stp: ["sourceReturn", "targetReturn"],
   "mutual-ace": ["returnRate"],
-  "insurance-need": ["returnRate"],
 };
 
 const SCENARIOS = [
@@ -141,7 +137,6 @@ function applyScenario(activeId, inputs, scenarioId) {
 function getDurationYears(activeId, inputs) {
   if (activeId === "retirement") return Math.max(1, number(inputs.retirementAge) - number(inputs.currentAge));
   if (activeId === "stp") return Math.max(1, Math.ceil(number(inputs.months) / 12));
-  if (activeId === "insurance-need") return Math.max(1, number(inputs.yearsSupport));
   return Math.max(1, number(inputs.years));
 }
 
@@ -154,7 +149,6 @@ function buildProjection(activeId, inputs) {
     if ("years" in nextInputs) nextInputs.years = year;
     if (activeId === "retirement") nextInputs.retirementAge = number(inputs.currentAge) + year;
     if (activeId === "stp") nextInputs.months = year * 12;
-    if (activeId === "insurance-need") nextInputs.yearsSupport = Math.max(1, year);
     points.push({
       label: year === 0 ? "Today" : `Y${year}`,
       year,
@@ -323,16 +317,6 @@ function calculate(activeId, inputs) {
         chart: [{ label: "Existing", value: existing.value }, { label: "Lumpsum", value: lump.value }, { label: "SIP", value: sip.value }],
       };
     }
-    case "insurance-need": {
-      const expenseCorpus = number(inputs.annualExpense) * ((1 + number(inputs.inflation) / 100) ** number(inputs.yearsSupport));
-      const need = expenseCorpus + number(inputs.liabilities) + number(inputs.goals) - number(inputs.existingCover) - number(inputs.existingAssets);
-      return {
-        headline: Math.max(0, need),
-        label: "Additional cover required",
-        metrics: [["Family expense provision", expenseCorpus], ["Liabilities", number(inputs.liabilities)], ["Goals", number(inputs.goals)], ["Existing cover/assets", number(inputs.existingCover) + number(inputs.existingAssets)]],
-        chart: [{ label: "Need", value: expenseCorpus + number(inputs.liabilities) + number(inputs.goals) }, { label: "Existing", value: number(inputs.existingCover) + number(inputs.existingAssets) }],
-      };
-    }
     default:
       return { headline: 0, label: "Result", metrics: [], chart: [] };
   }
@@ -348,7 +332,6 @@ const INPUTS = {
   swp: [["corpus", "Initial Corpus"], ["monthlyWithdrawal", "Monthly Withdrawal"], ["returnRate", "Expected Return (%)"], ["years", "Withdrawal Period (Years)"]],
   stp: [["corpus", "Source Corpus"], ["monthlyTransfer", "Monthly Transfer"], ["sourceReturn", "Source Return (%)"], ["targetReturn", "Target Return (%)"], ["months", "Transfer Period (Months)"]],
   "mutual-ace": [["existingCorpus", "Existing Corpus"], ["monthly", "Monthly SIP"], ["annualStepUp", "Annual SIP Step-up (%)"], ["lumpsum", "Fresh Lumpsum"], ["returnRate", "Expected Return (%)"], ["years", "Time Period (Years)"]],
-  "insurance-need": [["annualExpense", "Annual Family Expense"], ["liabilities", "Outstanding Liabilities"], ["goals", "Future Goals"], ["existingCover", "Existing Insurance Cover"], ["existingAssets", "Existing Liquid Assets"], ["yearsSupport", "Years of Support"], ["inflation", "Inflation (%)"], ["returnRate", "Return on Corpus (%)"]],
 };
 
 export default function CalculatorsPage() {
@@ -497,7 +480,7 @@ export default function CalculatorsPage() {
       <PageHeader
         eyebrow="Financial planning suite"
         title="Interactive CRM Calculators"
-        description="Built-in investment, planning, retirement, withdrawal, transfer, and insurance calculators with exportable PDF-ready reports."
+        description="Built-in investment, planning, retirement, withdrawal, and transfer calculators with exportable PDF-ready reports."
         icon={Calculator}
       />
 

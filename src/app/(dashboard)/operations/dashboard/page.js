@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CalendarClock, CalendarDays, ClipboardList, FileText, ListChecks, PauseCircle, Umbrella } from "lucide-react";
+import { AlertTriangle, CalendarDays, ClipboardList, FileText, ListChecks, PauseCircle } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
@@ -91,7 +91,6 @@ export default function OperationsDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, refreshDashboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "task_assignments" }, refreshDashboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "sip_events" }, refreshDashboard)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insurance_policies" }, refreshDashboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "operation_self_tasks" }, refreshDashboard)
       .subscribe();
 
@@ -122,8 +121,6 @@ export default function OperationsDashboard() {
         <Card title="My SIP Follow-ups" value={metrics.my_sip_followups_pending || 0} icon={PauseCircle} tone="amber" href="/admin/sip-tracker?follow_up_status=pending" />
         <Card title="SIP Terminated" value={metrics.sip_terminated_total || 0} icon={PauseCircle} tone="red" href="/admin/sip-tracker?event_type=terminated" />
         <Card title="SIP Rejected" value={metrics.sip_rejected_total || 0} icon={AlertTriangle} tone="violet" href="/admin/sip-tracker?event_type=rejected" />
-        <Card title="Insurance Due 30 Days" value={metrics.insurance_due_next_30 || 0} icon={CalendarClock} href="/admin/insurance" />
-        <Card title="Pending Renewals" value={metrics.insurance_pending_renewals || 0} icon={Umbrella} tone="amber" href="/admin/insurance" />
         <Card title="My Work Pending" value={metrics.self_tasks_pending || 0} icon={ListChecks} tone="violet" href="/operations/my-work-tracker?status=Pending" />
         <Card title="My Work This Week" value={metrics.self_tasks_this_week || 0} icon={CalendarDays} tone="blue" href="/operations/my-work-tracker" />
       </div>

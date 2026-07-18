@@ -3,9 +3,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { getAdminUserIds } from "@/lib/notifications/service";
 import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
 import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
-import { generateInsuranceRenewalNotifications } from "@/lib/insurance/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
-import { buildInsuranceSummary, inferPaymentStatus } from "@/lib/insurance/renewals";
 import { getTaskLifecycle, summarizeTasks } from "@/lib/tasks/performance";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +46,16 @@ function summarizeBy(items, key) {
   }, {});
 }
 
+function isRetiredInsuranceNotification(notification) {
+  const type = String(notification.notification_type || notification.type || "").toLowerCase();
+  const entityType = String(notification.entity_type || "").toLowerCase();
+  const linkUrl = String(notification.link_url || "").toLowerCase();
+
+  return type.includes("insurance")
+    || entityType === "insurance_policy"
+    || linkUrl.includes("/admin/insurance");
+}
+
 export async function GET(request) {
   const supabase = await createClient(request);
   const taskDb = getTaskDataClient(supabase);
@@ -58,17 +66,12 @@ export async function GET(request) {
   }
 
   await generateTaskDateNotifications(supabase, user.id);
-  await generateInsuranceRenewalNotifications(supabase, user.id);
 
   const admin = isAdmin(role);
   const today = dateKey();
   const monthStart = monthStartKey();
 
-  const renewalWindow = new Date();
-  renewalWindow.setDate(renewalWindow.getDate() + 30);
-  const renewalWindowKey = dateKey(renewalWindow);
-
-  const [clientsRes, documentsRes, tasksRes, taskActivityRes, profilesRes, notificationsRes, riskRes, insuranceRes, sipRes, selfTasksRes] = await Promise.all([
+  const [clientsRes, documentsRes, tasksRes, taskActivityRes, profilesRes, notificationsRes, riskRes, sipRes, selfTasksRes, kycStatusesRes] = await Promise.all([
     supabase
       .from("clients")
       .select("id, full_name, created_at, updated_at, operations_owner, relationship_manager, tax_status, holding_pattern")
@@ -97,10 +100,6 @@ export async function GET(request) {
       .select("id, client_id, status")
       .neq("status", "Approved"),
     taskDb
-      .from("insurance_policies")
-      .select("id, client_id, renewal_date, due_date, status, payment_status, through_company, premium_amount, next_follow_up_date, grace_period_end_date")
-      .eq("status", "Active"),
-    taskDb
       .from("sip_events")
       .select("id, client_id, assigned_to, event_type, follow_up_status, matched_status, termination_date, end_date, created_at")
       .order("created_at", { ascending: false }),
@@ -108,6 +107,10 @@ export async function GET(request) {
       .from("operation_self_tasks")
       .select("id, created_by, task_date, status, is_archived")
       .eq("is_archived", false),
+    taskDb
+      .from("client_kyc_statuses")
+      .select("id, client_name, pan_number, kyc_status, updated_at, created_by")
+      .order("client_name", { ascending: true }),
   ]);
 
   const taskIds = (tasksRes.data || []).map((task) => task.id);
@@ -144,14 +147,10 @@ export async function GET(request) {
   const documentsRequiringAction = visibleDocuments.filter((document) =>
     ["Uploaded", "Parsed", "Under review", "Rejected"].includes(document.status)
   );
+  const visibleNotifications = (notificationsRes.data || []).filter(
+    (notification) => !isRetiredInsuranceNotification(notification)
+  );
   const visibleRiskAssessments = (riskRes.data || []).filter((assessment) => visibleClientIds.has(assessment.client_id));
-  const visibleInsurancePolicies = (insuranceRes.data || []).filter((policy) => !policy.client_id || visibleClientIds.has(policy.client_id));
-  const visibleInsuranceSummary = buildInsuranceSummary(visibleInsurancePolicies);
-  const visibleInsuranceFollowUps = visibleInsurancePolicies.filter((policy) => {
-    const status = inferPaymentStatus(policy);
-    const dueDate = policy.due_date || policy.renewal_date;
-    return status !== "Paid" && status !== "Lapsed" && dueDate && dueDate <= renewalWindowKey;
-  });
   const allSipEvents = sipRes.error ? [] : (sipRes.data || []);
   const visibleSipEvents = admin
     ? allSipEvents
@@ -184,6 +183,8 @@ export async function GET(request) {
     ? (selfTasksRes.data || [])
     : (selfTasksRes.data || []).filter((task) => task.created_by === user.id);
   const selfTasksThisWeek = visibleSelfTasks.filter((task) => task.task_date >= week.start && task.task_date <= week.end);
+  const kycStatuses = kycStatusesRes.error ? [] : (kycStatusesRes.data || []);
+  const uncheckedKycStatuses = kycStatuses.filter((record) => record.kyc_status === "Not Checked");
 
   const operationsUsers = (profilesRes.data || []).filter((profile) => {
     const profileRole = String(profile.role || "").trim().toLowerCase();
@@ -239,15 +240,8 @@ export async function GET(request) {
       pending_tasks: pendingTasks.length,
       overdue_tasks: overdueTasks.length,
       due_today_tasks: dueTodayTasks.length,
-      unread_notifications: notificationsRes.data?.length || 0,
+      unread_notifications: visibleNotifications.length,
       risk_profiling_pending: visibleRiskAssessments.length,
-      insurance_follow_up: visibleInsuranceFollowUps.length,
-      insurance_due_next_30: visibleInsuranceSummary.due_next_30_days || 0,
-      insurance_pending_renewals: visibleInsurancePolicies.filter((policy) =>
-        ["Pending", "Grace Period", "Overdue"].includes(inferPaymentStatus(policy))
-      ).length,
-      insurance_pending_followups: visibleInsuranceSummary.pending_followups || 0,
-      insurance_amount_due: visibleInsuranceSummary.renewal_amount_due || 0,
       sip_terminated_this_week: sipTerminatedThisWeek.length,
       sip_paused_this_week: sipPausedThisWeek.length,
       sip_rejected_this_week: sipRejectedThisWeek.length,
@@ -258,6 +252,8 @@ export async function GET(request) {
       sip_resolved_total: visibleSipEvents.filter((event) => event.follow_up_status === "resolved").length,
       sip_unmatched_records: admin ? sipUnmatchedRecords.length : 0,
       my_sip_followups_pending: sipPendingFollowUps.filter((event) => event.assigned_to === user.id).length,
+      kyc_not_checked: uncheckedKycStatuses.length,
+      kyc_total_records: kycStatuses.length,
       self_tasks_pending: visibleSelfTasks.filter((task) => task.status !== "Done" && task.status !== "Cancelled").length,
       self_tasks_done_today: visibleSelfTasks.filter((task) => task.status === "Done" && task.task_date === today).length,
       self_tasks_this_week: selfTasksThisWeek.length,
@@ -268,12 +264,7 @@ export async function GET(request) {
     clients_by_tax_status: summarizeBy(clientsRes.data || [], "tax_status"),
     clients_by_holding_pattern: summarizeBy(clientsRes.data || [], "holding_pattern"),
     risk_by_status: summarizeBy(visibleRiskAssessments, "status"),
-    insurance_by_status: summarizeBy(visibleInsurancePolicies, "status"),
-    insurance_by_payment_status: visibleInsurancePolicies.reduce((acc, policy) => {
-      const status = inferPaymentStatus(policy);
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {}),
+    kyc_by_status: summarizeBy(kycStatuses, "kyc_status"),
     sip_by_event_type: summarizeBy(allSipEvents, "event_type"),
     sip_by_follow_up_status: summarizeBy(allSipEvents, "follow_up_status"),
     operations_summary: admin ? operationsSummary : [],
@@ -282,13 +273,12 @@ export async function GET(request) {
     overdue_tasks: overdueTasks.slice(0, 6),
     due_today_tasks: dueTodayTasks.slice(0, 6),
     documents_requiring_action: documentsRequiringAction.slice(0, 8),
-    notifications: notificationsRes.data || [],
+    notifications: visibleNotifications,
     birthdays: {
       ...birthdayData,
       upcoming: nearestUpcomingBirthdays,
     },
     risk_profiles_pending: visibleRiskAssessments.slice(0, 6),
-    insurance_followups: visibleInsuranceFollowUps.slice(0, 6),
     sip_events: visibleSipEvents.slice(0, 6),
   }, { status: 200 });
 }

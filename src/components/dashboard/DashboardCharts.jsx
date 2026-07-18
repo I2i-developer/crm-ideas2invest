@@ -86,90 +86,6 @@ function DoughnutChart({ values }) {
   );
 }
 
-const insuranceStatusStyles = {
-  Overdue: { color: "#dc2626", soft: "#fee2e2", priority: 1 },
-  Lapsed: { color: "#be123c", soft: "#ffe4e6", priority: 2 },
-  "Grace Period": { color: "#f59e0b", soft: "#fef3c7", priority: 3 },
-  Pending: { color: "#2563eb", soft: "#dbeafe", priority: 4 },
-  Paid: { color: "#16a34a", soft: "#dcfce7", priority: 5 },
-};
-
-function InsuranceRenewalHealth({ values }) {
-  const entries = entriesFromMap(values);
-  if (!entries.length) return <EmptyChart />;
-
-  const orderedEntries = [...entries].sort((a, b) => {
-    const aPriority = insuranceStatusStyles[a[0]]?.priority || 99;
-    const bPriority = insuranceStatusStyles[b[0]]?.priority || 99;
-    return aPriority - bPriority;
-  });
-  const total = entries.reduce((sum, [, value]) => sum + Number(value), 0);
-  const actionStatuses = new Set(["overdue", "lapsed", "pending", "grace period"]);
-  const actionsNeeded = entries
-    .filter(([label]) => actionStatuses.has(label.toLowerCase()))
-    .reduce((sum, [, value]) => sum + Number(value), 0);
-
-  return (
-    <div className="flex min-h-[240px] flex-col justify-center">
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex w-full items-end justify-between gap-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total policies</p>
-            <p className="mt-1 text-3xl font-semibold text-slate-950">{total}</p>
-          </div>
-          <div className="border-l border-slate-200 pl-6">
-            <p className="text-right text-xs font-semibold uppercase tracking-wide text-amber-600">Actions needed</p>
-            <p className="mt-1 text-right text-3xl font-semibold text-amber-700">{actionsNeeded}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 flex h-14 overflow-hidden rounded-xl border-4 border-white bg-slate-100 shadow-lg ring-1 ring-slate-200">
-        {orderedEntries.map(([label, value]) => {
-          const share = (Number(value) / total) * 100;
-          const style = insuranceStatusStyles[label] || { color: "#64748b" };
-          return (
-            <div
-              key={label}
-              className="group relative flex min-w-5 items-center justify-center border-r-2 border-white/80 transition-all last:border-r-0 hover:brightness-95"
-              style={{ width: `${share}%`, backgroundColor: style.color }}
-            >
-              {share >= 14 && (
-                <span className="text-sm font-bold text-white drop-shadow-sm">{Math.round(share)}%</span>
-              )}
-              <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-xl group-hover:block">
-                {label}: {value} policies ({Math.round(share)}%)
-                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-slate-950" />
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        {orderedEntries.map(([label, value]) => {
-          const share = Math.round((Number(value) / total) * 100);
-          const style = insuranceStatusStyles[label] || { color: "#64748b", soft: "#f1f5f9" };
-          return (
-            <div
-              key={label}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2.5"
-            >
-              <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-700">
-                <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: style.color }} />
-                <span className="truncate">{label}</span>
-              </span>
-              <span className="whitespace-nowrap text-xs text-slate-500">
-                <strong className="text-sm text-slate-950">{value}</strong> · {share}%
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function BarChart({ values, horizontal = false }) {
   const entries = entriesFromMap(values);
   if (!entries.length) return <EmptyChart />;
@@ -273,7 +189,6 @@ function PipelineBars({ metrics = {} }) {
     { label: "Pending Tasks", value: metrics.pending_tasks || 0, color: "bg-violet-600" },
     { label: "Docs To Verify", value: metrics.pending_document_verification || 0, color: "bg-amber-500" },
     { label: "Risk Pending", value: metrics.risk_profiling_pending || 0, color: "bg-blue-600" },
-    { label: "Insurance Follow-up", value: metrics.insurance_follow_up || 0, color: "bg-green-600" },
   ];
   const max = Math.max(...items.map((item) => item.value), 1);
 
@@ -302,7 +217,7 @@ export default function DashboardCharts({ data, mode = "admin" }) {
   const taskTitle = mode === "operations" ? "My Task Status" : "Task Status";
   const pipelineSubtitle =
     mode === "operations"
-      ? "Your work requiring attention across tasks, documents, risk, and insurance."
+      ? "Your work requiring attention across tasks, documents, and risk."
       : "Key queues that need team follow-up.";
 
   return (
@@ -315,15 +230,15 @@ export default function DashboardCharts({ data, mode = "admin" }) {
         <PipelineBars metrics={metrics} />
       </ChartCard>
 
+      <ChartCard title="KYC Status Tracker" subtitle="KYC verification state across tracked client records.">
+        <BarChart values={data?.kyc_by_status} horizontal />
+      </ChartCard>
+
       {mode === "operations" && (
         <ChartCard title="My Work Tracker" subtitle="Your self-work entries grouped by current status.">
           <WorkTrackerBarChart values={data?.self_tasks_by_status} />
         </ChartCard>
       )}
-
-      <ChartCard title="Insurance Renewal Mix" subtitle="Simple status distribution across the renewal queue.">
-        <InsuranceRenewalHealth values={data?.insurance_by_payment_status} />
-      </ChartCard>
 
       <ChartCard title={taskTitle} subtitle="Breakdown of work by current status.">
         <DoughnutChart values={data?.tasks_by_status} />

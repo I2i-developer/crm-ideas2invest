@@ -287,7 +287,7 @@ export default function CompanyPage() {
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Portal Credentials</h2>
-                <p className="mt-1 text-sm text-gray-500">Masked credential vault for AMC, RTA, exchange, and insurance portals.</p>
+                <p className="mt-1 text-sm text-gray-500">Masked credential vault for AMC, RTA, exchange, and platform portals.</p>
               </div>
               <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                 {credentials.length} saved
