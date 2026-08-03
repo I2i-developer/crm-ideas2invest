@@ -205,28 +205,30 @@
 
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
   ChevronLeft,
   Search,
   ClipboardList,
+  ListTodo,
   ShieldCheck,
   Cake,
   Calculator,
   BadgeCheck,
+  IdCard,
   ShieldQuestion,
   FileCheck2,
   ChartCandlestick,
   LibraryBig,
   ListChecks,
   ChartNoAxesCombined,
+  Sparkles,
 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 
 function isActiveRoute(currentPath, itemPath, matchType = "section") {
   if (!currentPath || !itemPath) return false;
@@ -240,18 +242,8 @@ function isActiveRoute(currentPath, itemPath, matchType = "section") {
   return normalizedCurrent === normalizedItem || normalizedCurrent.startsWith(`${normalizedItem}/`);
 }
 
-function isSupabaseLockAbort(error) {
-  const message = String(error?.message || error || "").toLowerCase();
-  return message.includes("lock broken") || message.includes("aborterror");
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, setMobileOpen }) {
+export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, setMobileOpen, profile = null }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [hoverLabel, setHoverLabel] = useState(null);
@@ -273,6 +265,16 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     role: "",
   });
 
+  useEffect(() => {
+    if (!profile) return;
+    setUserData({
+      name: profile.name || profile.full_name || profile.email || "CRM User",
+      designation: profile.designation || "",
+      avatar: profile.avatar_url || "/images/profiles/default.png",
+      role: profile.role || "",
+    });
+  }, [profile]);
+
   const menu = [
     {
       name: "Dashboard",
@@ -282,12 +284,13 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     },
     { name: "Clients", path: "/admin/clients", icon: Users },
     { name: "Birthdays", path: "/admin/birthdays", icon: Cake },
-    { name: "Tasks", path: "/dashboard/tasks", icon: ClipboardList },
+    { name: "Tasks", path: "/dashboard/tasks", icon: ListTodo },
     { name: "Team Performance", path: "/admin/team-performance", icon: ChartNoAxesCombined, adminOnly: true },
+    { name: "Meeting Notes", path: "/admin/meeting-notes", icon: ClipboardList },
     { name: "My Work Tracker", path: "/operations/my-work-tracker", icon: ListChecks, operationsOnly: true },
     { name: "SIP Tracker", path: "/admin/sip-tracker", icon: ChartCandlestick },
     { name: "Forms Center", path: "/admin/forms-center", icon: LibraryBig },
-    { name: "KYC Status", path: "/admin/kyc-status", icon: BadgeCheck },
+    { name: "KYC Status", path: "/admin/kyc-status", icon: IdCard },
     { name: "Calculators", path: "/admin/calculators", icon: Calculator },
     { name: "Risk Profiling", path: "/admin/risk-profiling", icon: ShieldQuestion },
     { name: "Required Docs", path: "/admin/document-requirements", icon: FileCheck2 },
@@ -298,51 +301,6 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     if (item.operationsOnly && userData.role !== "operations") return false;
     return true;
   });
-
-  const fetchUserProfile = useCallback(async () => {
-    let lastError = null;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-
-        const user = sessionData?.session?.user;
-
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("name, designation, avatar_url, role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        setUserData({
-          name: data?.name || user.email || "CRM User",
-          designation: data?.designation || "",
-          avatar: data?.avatar_url || "/images/profiles/default.png",
-          role: data?.role || "",
-        });
-        return;
-      } catch (error) {
-        lastError = error;
-        if (!isSupabaseLockAbort(error) || attempt === 2) break;
-        await wait(150 * (attempt + 1));
-      }
-    }
-
-    if (isSupabaseLockAbort(lastError)) return;
-    console.error("Error fetching profile:", lastError?.message || lastError);
-  }, [router]);
-
-  useEffect(() => {
-    fetchUserProfile();
-  }, [fetchUserProfile]);
 
   const showCollapsedLabel = (event, label) => {
     if (!collapsed) return;

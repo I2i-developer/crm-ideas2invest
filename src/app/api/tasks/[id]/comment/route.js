@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
+import { notifyUsers } from "@/lib/notifications/service";
 
 export async function POST(request, { params }) {
   const supabase = await createClient(request);
@@ -100,18 +101,15 @@ export async function POST(request, { params }) {
     .filter((recipientId) => recipientId && recipientId !== user.id);
 
   if (recipients.length > 0) {
-    await taskDb.from("task_notifications").insert(
-      recipients.map((recipientId) => ({
-        user_id: recipientId,
-        task_id: id,
-        title: "New Task Remark",
-        message: `New remark on task: ${task.title}`,
-        notification_type: "task_comment_added",
-        entity_type: "task",
-        entity_id: id,
-        link_url: `/dashboard/tasks/${id}`,
-      }))
-    );
+    await notifyUsers(taskDb, recipients, {
+      taskId: id,
+      title: "New Task Remark",
+      message: `New remark on task: ${task.title}`,
+      type: "task_comment_added",
+      entityType: "task",
+      entityId: id,
+      linkUrl: `/dashboard/tasks/${id}`,
+    });
   }
 
   await writeAuditLog(supabase, {

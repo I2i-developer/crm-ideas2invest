@@ -1,3 +1,5 @@
+import { sendWebPushForNotification } from "@/lib/webPush/server";
+
 export async function createNotification(
   supabase,
   {
@@ -37,6 +39,12 @@ export async function createNotification(
   const errorText = error ? JSON.stringify(error) : "";
   if (error && !`${error.message || ""} ${errorText}`.includes("duplicate key")) {
     console.error("Notification creation failed:", error.message || errorText || error);
+  }
+
+  if (data) {
+    sendWebPushForNotification(supabase, data).catch((pushError) => {
+      console.error("Web push delivery failed:", pushError?.message || pushError);
+    });
   }
 
   return data;

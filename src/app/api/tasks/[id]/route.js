@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient, getValidTaskAssigneeIds } from "@/lib/tasks/assignees";
 import { hydrateTaskDetail } from "@/lib/tasks/hydrate";
+import { createNotification, notifyUsers } from "@/lib/notifications/service";
 
 // ================================================================
 // GET /api/tasks/[id]
@@ -171,34 +172,31 @@ export async function PUT(request, { params }) {
     }
 
     if (existingTask.created_by !== user.id) {
-      await taskDb.from("task_notifications").insert({
-        user_id: existingTask.created_by,
-        task_id: id,
+      await createNotification(taskDb, {
+        userId: existingTask.created_by,
+        taskId: id,
         title: "Task Status Updated",
         message: `Task "${existingTask.title}" status changed to ${status}`,
-        notification_type: "task_status_changed",
-        entity_type: "task",
-        entity_id: id,
-        link_url: `/dashboard/tasks/${id}`,
+        type: "task_status_changed",
+        entityType: "task",
+        entityId: id,
+        linkUrl: `/dashboard/tasks/${id}`,
       });
     }
 
     const assignedUserIds = existingTaskWithAssignments.task_assignments?.map((assignment) => assignment.user_id) || [];
-    const statusNotifications = assignedUserIds
-      .filter((userId) => userId !== user.id)
-      .map((userId) => ({
-        user_id: userId,
-        task_id: id,
+    const statusRecipients = assignedUserIds.filter((userId) => userId !== user.id);
+
+    if (statusRecipients.length > 0) {
+      await notifyUsers(taskDb, statusRecipients, {
+        taskId: id,
         title: "Task Status Updated",
         message: `Task "${existingTask.title}" status changed to ${status}`,
-        notification_type: "task_status_changed",
-        entity_type: "task",
-        entity_id: id,
-        link_url: `/dashboard/tasks/${id}`,
-      }));
-
-    if (statusNotifications.length > 0) {
-      await taskDb.from("task_notifications").insert(statusNotifications);
+        type: "task_status_changed",
+        entityType: "task",
+        entityId: id,
+        linkUrl: `/dashboard/tasks/${id}`,
+      });
     }
   }
 
@@ -227,21 +225,16 @@ export async function PUT(request, { params }) {
         return NextResponse.json({ error: `Task assignment failed: ${assignmentError.message}` }, { status: 500 });
       }
 
-      const notifications = toAdd.map(uid => ({
-        user_id: uid,
-        task_id: id,
+      await notifyUsers(taskDb, toAdd, {
+        taskId: id,
         title: "New Task Assigned",
         message: `You have been assigned to task: ${existingTask.title}`,
-        notification_type: "task_assigned",
-        entity_type: "task",
-        entity_id: id,
-        link_url: `/dashboard/tasks/${id}`,
-        dedupe_key: `task_assigned:${id}:${uid}`,
-      }));
-      const { error: notificationError } = await taskDb.from("task_notifications").insert(notifications);
-      if (notificationError && notificationError.code !== "23505") {
-        return NextResponse.json({ error: `Task notification failed: ${notificationError.message}` }, { status: 500 });
-      }
+        type: "task_assigned",
+        entityType: "task",
+        entityId: id,
+        linkUrl: `/dashboard/tasks/${id}`,
+        dedupeKey: `task_assigned:${id}`,
+      });
     }
 
     activityLog.action_type = "reassigned";

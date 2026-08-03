@@ -52,6 +52,55 @@ const initialFilters = {
 };
 
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#64748b"];
+const DONE_BY_COLORS = [
+  "border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200",
+  "border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200",
+  "border-violet-100 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-200",
+  "border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200",
+  "border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200",
+  "border-cyan-100 bg-cyan-50 text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-500/15 dark:text-cyan-200",
+];
+
+function selfStatusClass(status) {
+  const styles = {
+    Pending: "bg-amber-50 text-amber-700 border-amber-100 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200",
+    "In progress": "bg-blue-50 text-blue-700 border-blue-100 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200",
+    Done: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200",
+    "On hold": "bg-slate-50 text-slate-700 border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200",
+    Cancelled: "bg-red-50 text-red-700 border-red-100 dark:border-red-400/30 dark:bg-red-500/15 dark:text-red-200",
+  };
+  return styles[status] || styles.Pending;
+}
+
+function normalizeDoneByNames(value) {
+  return (value || [])
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      return String(item?.name || item?.label || "").trim();
+    })
+    .filter(Boolean);
+}
+
+function DoneByChips({ names }) {
+  const normalizedNames = normalizeDoneByNames(names);
+
+  if (normalizedNames.length === 0) {
+    return <span className="text-slate-400 dark:text-slate-500">-</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {normalizedNames.map((name, index) => (
+        <span
+          key={`${name}-${index}`}
+          className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${DONE_BY_COLORS[index % DONE_BY_COLORS.length]}`}
+        >
+          <span className="truncate">{name}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function options(rows, valueKey = "id", labelKey = "name") {
   return (rows || []).map((row) => ({
@@ -141,18 +190,102 @@ function TrendChart({ values }) {
   );
 }
 
+function SelfWorkActivityView({ tasks = [], summary, compact = false }) {
+  const counts = summary || {
+    open: tasks.filter((task) => !["Done", "Cancelled"].includes(task.status)).length,
+    done: tasks.filter((task) => task.status === "Done").length,
+    total: tasks.length,
+  };
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950">
+      <div className="border-b border-slate-200 p-4 sm:p-5 dark:border-slate-700">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900 dark:text-slate-50">Self-Tracked Work Activity</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+              View-only operations-created work records. These are excluded from assigned-task performance rates.
+            </p>
+          </div>
+          <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200">
+            Read only
+          </span>
+        </div>
+
+        {!compact && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Open self work", counts.open || 0, "text-amber-700 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-200"],
+              ["Done in view", counts.done || 0, "text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-200"],
+              ["Total entries", counts.total || 0, "text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200"],
+            ].map(([label, value, tone]) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <p className={`inline-flex rounded-lg px-2 py-1 text-xs font-semibold ${tone}`}>{label}</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-950 dark:text-slate-50">{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[980px] w-full divide-y divide-slate-100 text-sm dark:divide-slate-700">
+          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-300">
+            <tr>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Owner</th>
+              <th className="px-4 py-3">Client</th>
+              <th className="px-4 py-3">Work</th>
+              <th className="px-4 py-3">Remarks</th>
+              <th className="px-4 py-3">Done by</th>
+              <th className="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-700 dark:bg-slate-950">
+            {tasks.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-slate-500 dark:text-slate-300">No self work entries found.</td>
+              </tr>
+            ) : tasks.map((task) => (
+              <tr key={task.id} className="align-top transition hover:bg-blue-50/30 dark:hover:bg-blue-500/10">
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateDDMonYYYY(task.task_date, "-")}</td>
+                <td className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{task.owner?.name || "Operations"}</td>
+                <td className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{task.client_name || "-"}</td>
+                <td className="max-w-md px-4 py-3">
+                  <p className="font-medium text-slate-900 dark:text-slate-50">{task.task_description || "-"}</p>
+                </td>
+                <td className="max-w-sm px-4 py-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                  {task.remark || <span className="text-slate-400 dark:text-slate-500">-</span>}
+                </td>
+                <td className="px-4 py-3">
+                  <DoneByChips names={task.done_by} />
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${selfStatusClass(task.status)}`}>
+                    {task.status || "Pending"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function UserDrawer({ member, onClose }) {
   if (!member) return null;
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-slate-950/35" onClick={onClose}>
-      <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase text-blue-600">Operations performance</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-950">{member.name}</h2>
-            <p className="text-sm text-slate-500">{member.designation}</p>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-50">{member.name}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-300">{member.designation}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border p-2 hover:bg-slate-50" aria-label="Close details"><X size={18} /></button>
+          <button type="button" onClick={onClose} className="rounded-lg border p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800" aria-label="Close details"><X size={18} /></button>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -161,45 +294,43 @@ function UserDrawer({ member, onClose }) {
             ["Completed", member.completed],
             ["Overdue", member.overdue],
             ["Workload", member.current_workload],
-          ].map(([label, value]) => <div key={label} className="rounded-lg border bg-slate-50 p-3"><p className="text-xs text-slate-500">{label}</p><p className="text-xl font-semibold">{value}</p></div>)}
+          ].map(([label, value]) => <div key={label} className="rounded-lg border bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900"><p className="text-xs text-slate-500 dark:text-slate-300">{label}</p><p className="text-xl font-semibold text-slate-950 dark:text-slate-50">{value}</p></div>)}
         </div>
 
         <section className="mt-6">
-          <h3 className="font-semibold text-slate-900">Assigned tasks</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-50">Assigned tasks</h3>
           <div className="mt-3 space-y-2">
             {member.tasks?.length ? member.tasks.map((task) => (
-              <div key={task.id} className="rounded-lg border p-3 hover:border-blue-300 hover:bg-blue-50">
+              <div key={task.id} className="rounded-lg border p-3 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-400/60 dark:hover:bg-blue-500/15">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Link href={`/dashboard/tasks/${task.id}`} className="font-medium text-slate-900 hover:text-blue-700">{task.title}</Link>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{task.status}</span>
+                  <Link href={`/dashboard/tasks/${task.id}`} className="font-medium text-slate-900 hover:text-blue-700 dark:text-slate-50 dark:hover:text-blue-200">{task.title}</Link>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">{task.status}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{task.client?.full_name || "Internal task"}{task.due_date ? ` · Due ${formatDateDDMonYYYY(task.due_date, "-")}` : ""}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{task.client?.full_name || "Internal task"}{task.due_date ? ` · Due ${formatDateDDMonYYYY(task.due_date, "-")}` : ""}</p>
                 <div className="mt-2 flex gap-3 text-xs font-semibold">
                   <Link href={`/dashboard/tasks/${task.id}`} className="text-blue-700 hover:underline">Open task</Link>
                   <Link href={`/dashboard/tasks/${task.id}/edit`} className="text-violet-700 hover:underline">Edit / reassign</Link>
                 </div>
               </div>
-            )) : <p className="rounded-lg border border-dashed p-4 text-sm text-slate-500">No matching tasks.</p>}
+            )) : <p className="rounded-lg border border-dashed p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">No matching tasks.</p>}
           </div>
         </section>
 
         <section className="mt-6">
-          <h3 className="font-semibold text-slate-900">Recent task activity</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-50">Recent task activity</h3>
           <div className="mt-3 space-y-2">
             {member.recent_activity?.length ? member.recent_activity.map((activity) => (
-              <div key={activity.id} className="rounded-lg border p-3">
-                <p className="text-sm font-medium text-slate-800">{String(activity.action_type).replaceAll("_", " ")}</p>
-                <p className="text-xs text-slate-500">{formatDateTimeDDMonYYYY(activity.created_at, "-")}</p>
+              <div key={activity.id} className="rounded-lg border p-3 dark:border-slate-700 dark:bg-slate-900">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{String(activity.action_type).replaceAll("_", " ")}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300">{formatDateTimeDDMonYYYY(activity.created_at, "-")}</p>
               </div>
             )) : <p className="text-sm text-slate-500">No recent activity.</p>}
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-violet-100 bg-violet-50 p-4">
-          <h3 className="font-semibold text-violet-950">Self-Tracked Work Activity</h3>
-          <p className="mt-1 text-sm text-violet-700">Separate from assigned-task performance rates.</p>
-          <p className="mt-3 text-sm font-medium text-violet-950">{member.self_activity?.done || 0} done of {member.self_activity?.total || 0} records</p>
-        </section>
+        <div className="mt-6">
+          <SelfWorkActivityView tasks={member.self_activity?.records || []} compact />
+        </div>
       </aside>
     </div>
   );
@@ -262,7 +393,7 @@ export default function TeamPerformancePage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      <PageHeader eyebrow="Admin analytics" title="Operations Team Performance" description="Assigned-task workload, completion quality, ageing, and delivery trends." icon={UsersRound} actions={<button type="button" onClick={exportCsv} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download size={16} /> Export CSV</button>} />
+      <PageHeader eyebrow="Admin analytics" title="Operations Team Performance" description="Assigned-task workload, completion quality, ageing, and delivery trends." icon={UsersRound} actions={<button type="button" onClick={exportCsv} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"><Download size={16} /> Export CSV</button>} />
 
       <section className="glass-card p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -270,11 +401,11 @@ export default function TeamPerformancePage() {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[["date_from", "Assigned From"], ["date_to", "Assigned To"], ["due_from", "Due From"], ["due_to", "Due To"], ["completed_from", "Completed From"], ["completed_to", "Completed To"]].map(([name, label]) => (
-            <label key={name} className="text-xs font-semibold text-slate-600">{label}<input type="date" value={filters[name]} onChange={(event) => setFilter(name, event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" /></label>
+            <label key={name} className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}<input type="date" value={filters[name]} onChange={(event) => setFilter(name, event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50" /></label>
           ))}
           <div className="flex items-end gap-2">
             <button type="button" onClick={applyFilters} className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"><BarChart3 size={16} /> Apply</button>
-            <button type="button" onClick={resetFilters} className="inline-flex h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><FilterX size={16} /> Reset</button>
+            <button type="button" onClick={resetFilters} className="inline-flex h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"><FilterX size={16} /> Reset</button>
           </div>
         </div>
       </section>
@@ -303,18 +434,18 @@ export default function TeamPerformancePage() {
       </div>
 
       <section className="glass-card overflow-hidden">
-        <div className="flex items-center justify-between border-b p-5">
-          <div><h2 className="font-semibold text-slate-900">User Performance Comparison</h2><p className="text-xs text-slate-500">Assigned-task metrics only. Self-tracked work is excluded.</p></div>
+        <div className="flex items-center justify-between border-b p-5 dark:border-slate-700">
+          <div><h2 className="font-semibold text-slate-900 dark:text-slate-50">User Performance Comparison</h2><p className="text-xs text-slate-500 dark:text-slate-300">Assigned-task metrics only. Self-tracked work is excluded.</p></div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-[1550px] w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr>{["User", "Assigned", "Completed", "In Progress", "Pending", "Follow-up / Waiting", "Overdue", "On Time", "Late", "Reopened", "Completion Rate", "On-time Rate", "Avg Completion", "Workload", ""].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
-            <tbody className="divide-y">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950 dark:text-slate-300"><tr>{["User", "Assigned", "Completed", "In Progress", "Pending", "Follow-up / Waiting", "Overdue", "On Time", "Late", "Reopened", "Completion Rate", "On-time Rate", "Avg Completion", "Workload", ""].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {users.map((member) => (
-                <tr key={member.id} className="bg-white hover:bg-blue-50/60">
-                  <td className="px-3 py-3"><p className="font-semibold text-slate-900">{member.name}</p><p className="text-xs text-slate-500">{member.designation}</p></td>
-                  {[member.assigned, member.completed, member.in_progress, member.pending, `${member.follow_up} / ${member.waiting}`, member.overdue, member.completed_on_time, member.completed_late, member.reopened, `${member.completion_rate}%`, `${member.on_time_rate}%`, `${member.average_completion_days}d`, member.current_workload].map((value, index) => <td key={index} className="px-3 py-3 text-slate-700">{value}</td>)}
-                  <td className="px-3 py-3"><button type="button" onClick={() => setSelectedUser(member)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"><Eye size={14} /> Details</button></td>
+                <tr key={member.id} className="bg-white hover:bg-blue-50/60 dark:bg-slate-900 dark:hover:bg-blue-500/15">
+                  <td className="px-3 py-3"><p className="font-semibold text-slate-900 dark:text-slate-50">{member.name}</p><p className="text-xs text-slate-500 dark:text-slate-300">{member.designation}</p></td>
+                  {[member.assigned, member.completed, member.in_progress, member.pending, `${member.follow_up} / ${member.waiting}`, member.overdue, member.completed_on_time, member.completed_late, member.reopened, `${member.completion_rate}%`, `${member.on_time_rate}%`, `${member.average_completion_days}d`, member.current_workload].map((value, index) => <td key={index} className="px-3 py-3 text-base font-bold text-slate-800 dark:text-white">{value}</td>)}
+                  <td className="px-3 py-3"><button type="button" onClick={() => setSelectedUser(member)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-400/40 dark:bg-blue-500/15 dark:text-blue-200 dark:hover:bg-blue-500/25"><Eye size={14} /> Details</button></td>
                 </tr>
               ))}
             </tbody>
@@ -323,13 +454,7 @@ export default function TeamPerformancePage() {
         </div>
       </section>
 
-      <section className="glass-card p-5">
-        <h2 className="font-semibold text-slate-900">Self-Tracked Work Activity</h2>
-        <p className="mt-1 text-xs text-slate-500">Operations-created work records shown separately and excluded from assigned-task completion rates.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {users.map((member) => <div key={member.id} className="rounded-lg border bg-slate-50 p-3"><p className="font-medium text-slate-900">{member.name}</p><p className="mt-1 text-sm text-slate-600">{member.self_activity?.done || 0} done / {member.self_activity?.total || 0} total</p></div>)}
-        </div>
-      </section>
+      <SelfWorkActivityView tasks={data?.self_tasks || []} summary={data?.self_summary} />
 
       <UserDrawer member={selectedUser} onClose={() => setSelectedUser(null)} />
     </div>

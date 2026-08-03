@@ -39,15 +39,56 @@
 
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import HeaderActions from "@/components/HeaderActions";
 import HeaderBrand from "@/components/HeaderBrand";
 import { Menu } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+
+const DEFAULT_PROFILE = {
+  name: "",
+  full_name: "",
+  email: "",
+  designation: "",
+  avatar_url: "",
+  role: "",
+};
 
 export default function AdminLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+
+  const loadProfile = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("name, full_name, email, designation, avatar_url, role, notifications")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    setProfile({
+      id: user.id,
+      name: data?.name || data?.full_name || user.user_metadata?.full_name || user.email || "CRM User",
+      full_name: data?.full_name || "",
+      email: data?.email || user.email || "",
+      designation: data?.designation || "",
+      avatar_url: data?.avatar_url || "/images/profiles/default.png",
+      role: data?.role || "",
+      notifications: data?.notifications || {},
+    });
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -58,6 +99,7 @@ export default function AdminLayout({ children }) {
         setCollapsed={setCollapsed}
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
+        profile={profile}
       />
 
       {/* Main Content Area */}
@@ -74,7 +116,7 @@ export default function AdminLayout({ children }) {
             </button>
             <HeaderBrand />
           </div>
-          <HeaderActions />
+          <HeaderActions profile={profile} />
         </header>
         
         {/* Scrollable Content */}

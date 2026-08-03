@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { authFetch } from "@/lib/authFetch";
-import { Copy, Check, ClipboardList, PauseCircle } from "lucide-react";
+import { CalendarClock, Copy, Check, ClipboardList, PauseCircle, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
@@ -22,6 +22,7 @@ export default function CompleteClientInfo() {
   const [riskAssessments, setRiskAssessments] = useState([]);
   const [clientTasks, setClientTasks] = useState([]);
   const [sipEvents, setSipEvents] = useState([]);
+  const [meetingNotes, setMeetingNotes] = useState([]);
   const [sessionParsedData, setSessionParsedData] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
 
@@ -57,16 +58,19 @@ export default function CompleteClientInfo() {
 
   useEffect(() => {
     async function fetchClientModules() {
-      const [riskResponse, sipResponse] = await Promise.all([
+      const [riskResponse, sipResponse, meetingsResponse] = await Promise.all([
         authFetch(`/api/risk-profiling?client_id=${id}`),
         authFetch(`/api/sip-reports?client_id=${id}`),
+        authFetch(`/api/meeting-notes?client_id=${id}&limit=5`),
       ]);
 
       const riskData = await riskResponse.json().catch(() => ({}));
       const sipData = await sipResponse.json().catch(() => ({}));
+      const meetingsData = await meetingsResponse.json().catch(() => ({}));
 
       if (riskResponse.ok) setRiskAssessments(riskData.assessments || []);
       if (sipResponse.ok) setSipEvents(sipData.events || []);
+      if (meetingsResponse.ok) setMeetingNotes(meetingsData.meetings || []);
     }
 
     if (id) fetchClientModules();
@@ -424,6 +428,44 @@ export default function CompleteClientInfo() {
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Meeting Notes" noGrid>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">Recent meeting intelligence captured for this client.</p>
+          <Link
+            href={`/admin/meeting-notes?client_id=${id}`}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <Sparkles size={16} /> Add Meeting Note
+          </Link>
+        </div>
+        {meetingNotes.length === 0 ? (
+          <div className="mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
+            No meeting notes captured yet.
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {meetingNotes.map((meeting) => (
+              <Link
+                key={meeting.id}
+                href={`/admin/meeting-notes?meeting_id=${meeting.id}`}
+                className="block rounded-xl border bg-gray-50 p-4 transition hover:border-blue-200 hover:bg-blue-50"
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{meeting.title}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-gray-600">{meeting.overview || meeting.raw_notes || "Draft meeting note"}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-gray-500">
+                    <CalendarClock size={15} />
+                    {formatDateDDMonYYYY(meeting.meeting_datetime, "-")}
+                  </span>
+                </div>
+              </Link>
             ))}
           </div>
         )}

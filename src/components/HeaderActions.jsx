@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LogOut, Settings, X } from "lucide-react";
 import toast from "react-hot-toast";
 import CrmTooltip from "@/components/CrmTooltip";
@@ -11,44 +11,22 @@ import HeaderBasicCalculator from "@/components/HeaderBasicCalculator";
 import OperationsQuickNotes from "@/components/OperationsQuickNotes";
 import HeaderDateTime from "@/components/HeaderDateTime";
 import NotificationIcon from "@/components/NotificationIcon";
+import WebPushToggle from "@/components/WebPushToggle";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function HeaderActions() {
+export default function HeaderActions({ profile: profileProp = null }) {
   const [open, setOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
-  const [profile, setProfile] = useState({
+  const profile = useMemo(() => ({
     name: "",
     email: "",
     designation: "",
     role: "",
     avatar: "/images/profiles/default.png",
-  });
-
-  const fetchProfile = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("name, full_name, email, designation, avatar_url, role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    setProfile({
-      name: data?.name || data?.full_name || user.user_metadata?.full_name || user.email || "CRM User",
-      email: data?.email || user.email || "",
-      designation: data?.designation || "",
-      role: data?.role || "",
-      avatar: data?.avatar_url || "/images/profiles/default.png",
-    });
-  }, []);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    ...(profileProp || {}),
+    avatar: profileProp?.avatar_url || profileProp?.avatar || "/images/profiles/default.png",
+    name: profileProp?.name || profileProp?.full_name || profileProp?.email || "CRM User",
+  }), [profileProp]);
 
   useEffect(() => {
     if (!open && !imageOpen) return undefined;
@@ -81,8 +59,9 @@ export default function HeaderActions() {
       <HeaderDateTime />
       <HeaderBasicCalculator role={profile.role} />
       <OperationsQuickNotes role={profile.role} />
-      <ChatLauncher />
-      <NotificationIcon />
+      <ChatLauncher profile={profile} />
+      <WebPushToggle profile={profile} />
+      <NotificationIcon profile={profile} />
 
       <CrmTooltip content="Profile" side="bottom">
         <button

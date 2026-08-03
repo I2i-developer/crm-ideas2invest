@@ -65,11 +65,11 @@ function formatDateTime(value) {
 
 function summaryCards(summary) {
   return [
-    { label: "Total Records", value: summary.total || 0, icon: ShieldQuestion, tone: "bg-slate-50 text-slate-700" },
-    { label: "Validated", value: summary.validated || 0, icon: CheckCircle2, tone: "bg-emerald-50 text-emerald-700" },
-    { label: "Registered", value: summary.registered || 0, icon: ShieldCheck, tone: "bg-blue-50 text-blue-700" },
-    { label: "On-Hold", value: summary.on_hold || 0, icon: AlertTriangle, tone: "bg-amber-50 text-amber-700" },
-    { label: "Rejected", value: summary.rejected || 0, icon: X, tone: "bg-red-50 text-red-700" },
+    { label: "Total Records", value: summary.total || 0, icon: ShieldQuestion, tone: "bg-slate-50 text-slate-700 dark:bg-slate-700/70 dark:text-slate-100" },
+    { label: "Validated", value: summary.validated || 0, icon: CheckCircle2, tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100" },
+    { label: "Registered", value: summary.registered || 0, icon: ShieldCheck, tone: "bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-100" },
+    { label: "On-Hold", value: summary.on_hold || 0, icon: AlertTriangle, tone: "bg-amber-50 text-amber-700 dark:bg-amber-400/20 dark:text-amber-100" },
+    { label: "Rejected", value: summary.rejected || 0, icon: X, tone: "bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-100" },
   ];
 }
 
@@ -122,7 +122,7 @@ export default function KycStatusPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const nextFilters = { search: "", status: params.get("status") || "" };
+    const nextFilters = { search: params.get("search") || "", status: params.get("status") || "" };
     setFilters(nextFilters);
   }, []);
 
@@ -262,7 +262,7 @@ export default function KycStatusPage() {
   const cardData = summaryCards(summary);
 
   return (
-    <main className="min-h-full bg-slate-50 text-slate-900">
+    <main className="min-h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
       <PageHeader
         title="KYC Status Tracker"
         description="Upload PAN lists, reject duplicates, update KYC status, copy PANs, and export the working sheet."
@@ -298,11 +298,11 @@ export default function KycStatusPage() {
       <section className="mt-6 overflow-x-auto pb-1">
         <div className="grid min-w-[820px] grid-cols-5 gap-3">
           {cardData.map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">{label}</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-950 dark:text-slate-50">{value}</p>
                 </div>
                 <span className={`rounded-xl p-2.5 ${tone}`}>
                   <Icon size={21} />
@@ -313,17 +313,17 @@ export default function KycStatusPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.35fr)]">
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">Search name / PAN / remarks</span>
+              <span className="mb-1 block text-sm text-slate-800 dark:text-white">Search name / PAN / remarks</span>
               <span className="relative block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   value={filters.search}
                   onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-300 dark:focus:border-blue-300 dark:focus:ring-blue-400/20"
                   placeholder="Search by client or PAN"
                 />
               </span>
@@ -339,7 +339,7 @@ export default function KycStatusPage() {
             <button
               type="button"
               onClick={exportRecords}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-400/45 dark:bg-emerald-500/20 dark:text-emerald-100 dark:hover:bg-emerald-500/30"
             >
               <Download size={16} /> Export Sheet
             </button>
@@ -375,10 +375,10 @@ export default function KycStatusPage() {
 
       {canManageKycRecords && showForm && (
         <section className="mt-4">
-            <form onSubmit={saveRecord} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <form onSubmit={saveRecord} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-bold text-slate-950">{editingId ? "Edit KYC Record" : "Add KYC Record"}</h2>
-                <button type="button" onClick={resetForm} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+                <h2 className="text-base font-bold text-slate-950 dark:text-slate-50">{editingId ? "Edit KYC Record" : "Add KYC Record"}</h2>
+                <button type="button" onClick={resetForm} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
                   <X size={18} />
                 </button>
               </div>
@@ -402,29 +402,29 @@ export default function KycStatusPage() {
         </section>
       )}
 
-      <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <section className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <div>
-            <h2 className="text-base font-bold text-slate-950">KYC Working Sheet</h2>
-            <p className="text-sm text-slate-500">{records.length} record{records.length === 1 ? "" : "s"} in current view</p>
+            <h2 className="text-base font-bold text-slate-950 dark:text-slate-50">KYC Working Sheet</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-300">{records.length} record{records.length === 1 ? "" : "s"} in current view</p>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex min-h-64 items-center justify-center text-slate-500">
+          <div className="flex min-h-64 items-center justify-center text-slate-500 dark:text-slate-300">
             <Loader2 className="mr-2 animate-spin" size={20} /> Loading KYC statuses...
           </div>
         ) : records.length === 0 ? (
-          <div className="min-h-64 p-8 text-center text-slate-500">
+          <div className="min-h-64 p-8 text-center text-slate-500 dark:text-slate-300">
             <ShieldQuestion className="mx-auto mb-3 text-slate-300" size={36} />
-            <p className="font-semibold text-slate-700">No KYC records yet</p>
+            <p className="font-semibold text-slate-700 dark:text-slate-100">No KYC records yet</p>
             <p className="mt-1 text-sm">Upload a client PAN list or add a client manually to begin tracking.</p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-300">
                   <tr>
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">PAN</th>
@@ -434,13 +434,13 @@ export default function KycStatusPage() {
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {paginatedRecords.map((record) => (
-                    <tr key={record.id} className="hover:bg-slate-50/70">
+                    <tr key={record.id} className="hover:bg-slate-50/70 dark:bg-slate-900 dark:hover:bg-slate-800">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{record.client_name}</div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-50">{record.client_name}</div>
                         {record.client?.full_name && (
-                          <div className="text-xs text-emerald-700">Linked: {record.client.full_name}</div>
+                          <div className="text-xs text-emerald-700 dark:text-emerald-300">Linked: {record.client.full_name}</div>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -448,14 +448,14 @@ export default function KycStatusPage() {
                           <button
                             type="button"
                             onClick={() => copyPan(record.normalized_pan)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-sm font-semibold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-sm font-semibold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-blue-400/50 dark:hover:bg-blue-500/15 dark:hover:text-blue-200"
                             title="Copy PAN"
                           >
                             {record.normalized_pan}
                             <Clipboard size={14} />
                           </button>
                         ) : (
-                          <span className="inline-flex rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700">
+                          <span className="inline-flex rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 dark:border-amber-300/40 dark:bg-amber-400/15 dark:text-amber-100">
                             PAN Pending
                           </span>
                         )}
@@ -477,8 +477,8 @@ export default function KycStatusPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{record.last_checked_at ? formatDateTime(record.last_checked_at) : "-"}</td>
-                      <td className="max-w-xs px-4 py-3 text-slate-600">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{record.last_checked_at ? formatDateTime(record.last_checked_at) : "-"}</td>
+                      <td className="max-w-xs px-4 py-3 text-slate-600 dark:text-slate-300">
                         <span className="line-clamp-2">{record.remarks || "-"}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -487,7 +487,7 @@ export default function KycStatusPage() {
                             <button
                               type="button"
                               onClick={() => startEdit(record)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 dark:border-blue-300/60 dark:bg-blue-500/25 dark:text-blue-50 dark:hover:bg-blue-500/40"
                             >
                               <Pencil size={14} /> Edit
                             </button>
@@ -496,7 +496,7 @@ export default function KycStatusPage() {
                             <button
                               type="button"
                               onClick={() => setRecordToDelete(record)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-100"
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-100 dark:border-red-400/40 dark:bg-red-500/20 dark:text-red-100 dark:hover:bg-red-500/30"
                             >
                               <Trash2 size={14} /> Delete
                             </button>
@@ -509,14 +509,14 @@ export default function KycStatusPage() {
               </table>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-500">Page {currentPage} of {totalPages}</p>
+            <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
+              <p className="text-sm text-slate-500 dark:text-slate-300">Page {currentPage} of {totalPages}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-blue-300/45 dark:bg-blue-500/20 dark:text-blue-50 dark:hover:bg-blue-500/35"
                 >
                   Previous
                 </button>
@@ -524,7 +524,7 @@ export default function KycStatusPage() {
                   type="button"
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-blue-300/45 dark:bg-blue-500/20 dark:text-blue-50 dark:hover:bg-blue-500/35"
                 >
                   Next
                 </button>

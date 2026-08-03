@@ -57,6 +57,17 @@ const STATUS_STYLES = {
   Cancelled: styles.statusHold,
 };
 
+function formatTaskDueTime(value) {
+  if (!value || !String(value).includes("T")) return "";
+  const dueAt = new Date(value);
+  if (Number.isNaN(dueAt.getTime())) return "";
+  return dueAt.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export default function TaskList() {
   const searchParams = useSearchParams();
   const linkedClientId = searchParams.get("client_id");
@@ -316,91 +327,103 @@ export default function TaskList() {
               <p>No tasks found</p>
             </div>
           ) : (
-            tasks.map((task) => {
-              const StatusIcon = STATUS_ICONS[task.status] || Clock3;
-              const canDeleteTask = String(currentRole || "").toLowerCase() === "admin";
-              const completedItems = task.task_checklist?.filter((item) => item.is_completed).length || 0;
-              const totalItems = task.task_checklist?.length || 0;
+            <>
+              <div className={styles.taskTableHeader}>
+                <span>Task</span>
+                <span>Status & Due</span>
+                <span>Assigned To</span>
+                <span>Actions</span>
+              </div>
+              {tasks.map((task) => {
+                const StatusIcon = STATUS_ICONS[task.status] || Clock3;
+                const canDeleteTask = String(currentRole || "").toLowerCase() === "admin";
+                const completedItems = task.task_checklist?.filter((item) => item.is_completed).length || 0;
+                const totalItems = task.task_checklist?.length || 0;
+                const dueTime = formatTaskDueTime(task.due_date);
 
-              return (
-                <article key={task.id} className={styles.taskCard}>
-                  <div className={styles.taskMain}>
-                    <div className={styles.taskHeader}>
-                      <span className={`${styles.priorityBadge} ${PRIORITY_STYLES[task.priority] || styles.priorityMedium}`}>
-                        {task.priority}
-                      </span>
-                    </div>
+                return (
+                  <article key={task.id} className={styles.taskCard}>
+                    <div className={styles.taskMain}>
+                      <div className={styles.taskHeader}>
+                        <span className={`${styles.priorityBadge} ${PRIORITY_STYLES[task.priority] || styles.priorityMedium}`}>
+                          {task.priority}
+                        </span>
+                      </div>
 
-                    <h3 className={styles.taskTitle}>{task.title}</h3>
-                    {task.description && (
-                      <p className={styles.taskDesc}>
-                        {task.description.length > 130 ? `${task.description.substring(0, 130)}...` : task.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className={styles.taskMeta}>
-                    <span className={`${styles.statusBadge} ${STATUS_STYLES[task.status] || styles.statusPending}`}>
-                      <StatusIcon size={15} />
-                      {task.status}
-                    </span>
-
-                    {task.category && <span className={styles.categoryBadge}>{task.category}</span>}
-
-                    {task.due_date && (
-                      <span className={styles.dueDate}>
-                        <CalendarDays size={15} />
-                        {formatDateDDMonYYYY(task.due_date, "-")}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={styles.taskPeople}>
-                    <div className={styles.assignees}>
-                      {task.task_assignments?.slice(0, 3).map((assignment) => (
-                        <CrmTooltip key={assignment.id} content={assignment.assignee?.name || "Unassigned"}>
-                          <div className={styles.avatar}>
-                            {assignment.assignee?.avatar_url ? (
-                              <Image
-                                src={assignment.assignee.avatar_url}
-                                alt=""
-                                width={30}
-                                height={30}
-                                unoptimized
-                              />
-                            ) : (
-                              <span>{assignment.assignee?.name?.charAt(0) || "?"}</span>
-                            )}
-                          </div>
-                        </CrmTooltip>
-                      ))}
-                      {task.task_assignments?.length > 3 && (
-                        <div className={styles.avatarMore}>+{task.task_assignments.length - 3}</div>
+                      <h3 className={styles.taskTitle}>{task.title}</h3>
+                      {task.description && (
+                        <p className={styles.taskDesc}>
+                          {task.description.length > 130 ? `${task.description.substring(0, 130)}...` : task.description}
+                        </p>
                       )}
-                      {!task.task_assignments?.length && <span className={styles.unassigned}>Unassigned</span>}
                     </div>
 
-                    {totalItems > 0 && (
-                      <span className={styles.checklistProgress}>
-                        {completedItems}/{totalItems}
+                    <div className={styles.taskMeta}>
+                      <span className={`${styles.statusBadge} ${STATUS_STYLES[task.status] || styles.statusPending}`}>
+                        <StatusIcon size={15} />
+                        {task.status}
                       </span>
-                    )}
-                  </div>
 
-                  <div className={styles.taskActions}>
-                    <Link href={`/dashboard/tasks/${task.id}`} className={styles.viewBtn}>
-                      Open
-                      <ChevronRight size={15} />
-                    </Link>
-                    {canDeleteTask && (
-                      <button onClick={() => setTaskToDelete(task)} className={styles.deleteBtn} aria-label="Delete task">
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })
+                      {task.category && <span className={styles.categoryBadge}>{task.category}</span>}
+
+                      {task.due_date && (
+                        <span className={styles.dueDate}>
+                          <CalendarDays size={15} />
+                          <span className={styles.dueDateText}>
+                            <span>{formatDateDDMonYYYY(task.due_date, "-")}</span>
+                            {dueTime && <small>{dueTime}</small>}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={styles.taskPeople}>
+                      <div className={styles.assignees}>
+                        {task.task_assignments?.slice(0, 3).map((assignment) => (
+                          <CrmTooltip key={assignment.id} content={assignment.assignee?.name || "Unassigned"}>
+                            <div className={styles.avatar}>
+                              {assignment.assignee?.avatar_url ? (
+                                <Image
+                                  src={assignment.assignee.avatar_url}
+                                  alt=""
+                                  width={30}
+                                  height={30}
+                                  unoptimized
+                                />
+                              ) : (
+                                <span>{assignment.assignee?.name?.charAt(0) || "?"}</span>
+                              )}
+                            </div>
+                          </CrmTooltip>
+                        ))}
+                        {task.task_assignments?.length > 3 && (
+                          <div className={styles.avatarMore}>+{task.task_assignments.length - 3}</div>
+                        )}
+                        {!task.task_assignments?.length && <span className={styles.unassigned}>Unassigned</span>}
+                      </div>
+
+                      {totalItems > 0 && (
+                        <span className={styles.checklistProgress}>
+                          {completedItems}/{totalItems}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={styles.taskActions}>
+                      <Link href={`/dashboard/tasks/${task.id}`} className={styles.viewBtn}>
+                        Open
+                        <ChevronRight size={15} />
+                      </Link>
+                      {canDeleteTask && (
+                        <button onClick={() => setTaskToDelete(task)} className={styles.deleteBtn} aria-label="Delete task">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </>
           )}
         </div>
       </section>

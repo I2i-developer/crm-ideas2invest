@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient, getValidTaskAssigneeIds } from "@/lib/tasks/assignees";
 import { hydrateTaskList } from "@/lib/tasks/hydrate";
+import { notifyUsers } from "@/lib/notifications/service";
 
 // ================================================================
 // GET /api/tasks - List all tasks (filtered by role)
@@ -192,21 +193,16 @@ export async function POST(request) {
       return NextResponse.json({ error: `Task assignment failed: ${assignmentError.message}` }, { status: 500 });
     }
 
-    const notifications = validAssigneeIds.map(userId => ({
-      user_id: userId,
+    await notifyUsers(taskDb, validAssigneeIds, {
       task_id: task.id,
       title: "New Task Assigned",
       message: `You have been assigned to task: ${title}`,
-      notification_type: "task_assigned",
-      entity_type: "task",
-      entity_id: task.id,
-      link_url: `/dashboard/tasks/${task.id}`,
-      dedupe_key: `task_assigned:${task.id}:${userId}`,
-    }));
-    const { error: notificationError } = await taskDb.from("task_notifications").insert(notifications);
-    if (notificationError && notificationError.code !== "23505") {
-      return NextResponse.json({ error: `Task notification failed: ${notificationError.message}` }, { status: 500 });
-    }
+      type: "task_assigned",
+      entityType: "task",
+      entityId: task.id,
+      linkUrl: `/dashboard/tasks/${task.id}`,
+      dedupeKey: `task_assigned:${task.id}`,
+    });
   }
 
   await taskDb.from("task_activity_logs").insert({

@@ -236,6 +236,24 @@
   flex-direction: column;
 }
 
+.taskTableHeader {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(230px, 0.9fr) minmax(150px, 0.55fr) auto;
+  gap: 18px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.taskTableHeader span:last-child {
+  text-align: right;
+}
+
 .taskCard {
   display: grid;
   grid-template-columns: minmax(260px, 1.5fr) minmax(230px, 0.9fr) minmax(150px, 0.55fr) auto;
@@ -367,6 +385,19 @@
 .dueDate {
   gap: 6px;
   color: #475569;
+}
+
+.dueDateText {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.dueDateText small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 750;
 }
 
 .taskPeople {
@@ -507,8 +538,14 @@
 }
 
 @media (max-width: 1180px) {
+  .taskTableHeader,
   .taskCard {
     grid-template-columns: minmax(240px, 1fr) minmax(210px, 0.8fr);
+  }
+
+  .taskTableHeader span:nth-child(3),
+  .taskTableHeader span:nth-child(4) {
+    display: none;
   }
 
   .taskPeople,
@@ -535,7 +572,156 @@
     grid-template-columns: 1fr;
   }
 
+  .taskTableHeader {
+    display: none;
+  }
+
   .taskCard {
     grid-template-columns: 1fr;
   }
+}
+
+:global(.dark) .title,
+:global(.dark) .taskTitle,
+:global(.dark) .listHeader h2 {
+  color: #f8fafc;
+}
+
+:global(.dark) .subtitle,
+:global(.dark) .taskDesc,
+:global(.dark) .listHeader,
+:global(.dark) .listHeader p,
+:global(.dark) .filterLabel,
+:global(.dark) .taskNumber,
+:global(.dark) .empty {
+  color: #cbd5e1;
+}
+
+:global(.dark) .searchBox,
+:global(.dark) .filterPanel,
+:global(.dark) .listPanel {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border-color: rgba(71, 85, 105, 0.78) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35) !important;
+}
+
+:global(.dark) .searchBox:focus-within {
+  border-color: rgba(96, 165, 250, 0.72);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+}
+
+:global(.dark) .searchInput,
+:global(.dark) .filterSelect {
+  color: #f8fafc;
+  background: transparent;
+}
+
+:global(.dark) .searchInput::placeholder {
+  color: #94a3b8;
+}
+
+:global(.dark) .filterSelect {
+  background: rgba(2, 6, 23, 0.45);
+  border-color: rgba(71, 85, 105, 0.85);
+}
+
+:global(.dark) .filterBtn,
+:global(.dark) .clearFiltersBtn,
+:global(.dark) .viewBtn {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(71, 85, 105, 0.78);
+  color: #e2e8f0;
+}
+
+:global(.dark) .filterBtn:hover,
+:global(.dark) .filterBtn.filterActive,
+:global(.dark) .clearFiltersBtn:hover,
+:global(.dark) .viewBtn:hover,
+:global(.dark) .iconBtn:hover {
+  background: rgba(30, 64, 175, 0.26);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #93c5fd;
+}
+
+:global(.dark) .listHeader {
+  border-bottom-color: rgba(71, 85, 105, 0.7) !important;
+  background: rgba(2, 6, 23, 0.42) !important;
+}
+
+:global(.dark) .taskTableHeader {
+  background: rgba(2, 6, 23, 0.62) !important;
+  border-bottom-color: rgba(71, 85, 105, 0.7) !important;
+  color: #cbd5e1;
+}
+
+:global(.dark) .taskCard {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border-bottom-color: rgba(71, 85, 105, 0.6) !important;
+}
+
+:global(.dark) .taskCard:hover {
+  background: rgba(30, 41, 59, 0.98) !important;
+}
+
+:global(.dark) .priorityLow,
+:global(.dark) .statusCompleted {
+  background: rgba(6, 95, 70, 0.34);
+  color: #6ee7b7;
+}
+
+:global(.dark) .priorityMedium,
+:global(.dark) .statusProgress {
+  background: rgba(30, 64, 175, 0.35);
+  color: #93c5fd;
+}
+
+:global(.dark) .priorityHigh,
+:global(.dark) .statusPending {
+  background: rgba(146, 64, 14, 0.35);
+  color: #fcd34d;
+}
+
+:global(.dark) .priorityUrgent {
+  background: rgba(127, 29, 29, 0.4);
+  color: #fda4af;
+}
+
+:global(.dark) .statusHold,
+:global(.dark) .categoryBadge,
+:global(.dark) .checklistProgress,
+:global(.dark) .avatarMore,
+:global(.dark) .unassigned {
+  background: rgba(51, 65, 85, 0.72);
+  border-color: rgba(100, 116, 139, 0.65);
+  color: #cbd5e1;
+}
+
+:global(.dark) .dueDate {
+  color: #cbd5e1;
+}
+
+:global(.dark) .dueDateText small {
+  color: #94a3b8;
+}
+
+:global(.dark) .avatar {
+  background: rgba(14, 165, 233, 0.28);
+  color: #bae6fd;
+  border-color: #0f172a;
+}
+
+:global(.dark) .deleteBtn {
+  color: #fda4af;
+}
+
+:global(.dark) .deleteBtn:hover {
+  background: rgba(127, 29, 29, 0.34);
+  border-color: rgba(251, 113, 133, 0.38);
+  color: #fecdd3;
+}
+
+:global(.dark) .skeleton {
+  border-bottom-color: rgba(71, 85, 105, 0.55);
+  background: linear-gradient(90deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  background-size: 200% 100%;
 }

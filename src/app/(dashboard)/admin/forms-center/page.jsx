@@ -99,8 +99,8 @@ function ExternalButton({ onClick, children, quiet = false }) {
       type="button"
       onClick={onClick}
       className={quiet
-        ? "inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-        : "inline-flex h-9 items-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-blue-700"}
+        ? "inline-flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-400/45 dark:bg-blue-500/20 dark:text-blue-100 dark:hover:bg-blue-500/30"
+        : "inline-flex h-9 items-center gap-2 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-blue-700 dark:bg-blue-500/25 dark:text-blue-100 dark:hover:bg-blue-500/35"}
     >
       {children}
     </button>
@@ -112,7 +112,7 @@ function FactsheetButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900"
+      className="inline-flex h-9 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-300/45 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
     >
       <FileText size={14} /> Factsheet
     </button>
@@ -325,7 +325,7 @@ export default function FormsInformationCenterPage() {
           <>
             {admin && (
               <CrmTooltip content="Verify official directory links">
-                <button type="button" onClick={() => verifyLinks()} disabled={verifying} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-60">
+                <button type="button" onClick={() => verifyLinks()} disabled={verifying} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
                   <RefreshCw size={17} className={verifying ? "animate-spin" : ""} />
                 </button>
               </CrmTooltip>
@@ -337,8 +337,8 @@ export default function FormsInformationCenterPage() {
         )}
       />
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4 sm:p-5">
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="border-b border-slate-200 p-4 sm:p-5 dark:border-slate-700">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Official forms directory</h2>
@@ -346,25 +346,25 @@ export default function FormsInformationCenterPage() {
             </div>
             <div className="relative min-w-0 sm:w-80">
               <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search AMC or RTA" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search AMC or RTA" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:bg-slate-950" />
             </div>
           </div>
           <div className="mt-4 flex gap-2">
             {["All", "RTAs", "AMCs"].map((item) => (
-              <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${filter === item ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+              <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${filter === item ? "bg-slate-950 text-white dark:bg-blue-500/25 dark:text-blue-100" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"}`}>
                 {item}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-100 dark:divide-slate-700">
           {loading ? (
             <p className="p-10 text-center text-sm text-slate-500">Loading official forms directory...</p>
           ) : visibleOrganizations.length === 0 ? (
             <p className="p-10 text-center text-sm font-medium text-slate-500">No organization matches your search.</p>
           ) : visibleOrganizations.map((organization) => (
-            <article key={organization.id} className={`grid gap-4 p-4 transition hover:bg-blue-50/30 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_auto_minmax(160px,0.6fr)_auto] lg:items-center ${!organization.active ? "opacity-55" : ""}`}>
+            <article key={organization.id} className={`grid gap-4 p-4 transition hover:bg-blue-50/30 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_auto_minmax(160px,0.6fr)_auto] lg:items-center dark:hover:bg-blue-500/10 ${!organization.active ? "opacity-55" : ""}`}>
               <button type="button" onClick={() => loadForms(organization)} className="flex min-w-0 items-center gap-3 text-left">
                 <Logo organization={organization} />
                 <span className="min-w-0">
@@ -400,15 +400,15 @@ export default function FormsInformationCenterPage() {
                   {admin && (
                     <>
                   <CrmTooltip content={`${organization.verification_status || "unknown"} · ${organization.last_http_status || "not checked"}`}>
-                    <button type="button" onClick={() => verifyLinks(organization.id)} disabled={verifying} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><RefreshCw size={15} /></button>
+                    <button type="button" onClick={() => verifyLinks(organization.id)} disabled={verifying} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} /></button>
                   </CrmTooltip>
                     </>
                   )}
                   <CrmTooltip content="Edit organization">
-                    <button type="button" onClick={() => editOrganization(organization)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><Pencil size={15} /></button>
+                    <button type="button" onClick={() => editOrganization(organization)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil size={15} /></button>
                   </CrmTooltip>
                   {admin && <CrmTooltip content="Archive organization">
-                    <button type="button" onClick={() => setArchiveTarget({ kind: "organization", item: organization })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+                    <button type="button" onClick={() => setArchiveTarget({ kind: "organization", item: organization })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 dark:border-red-400/35 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/25"><Trash2 size={15} /></button>
                   </CrmTooltip>}
                 </div>
               )}
@@ -419,8 +419,8 @@ export default function FormsInformationCenterPage() {
 
       {selectedOrganization && (
         <div className="fixed inset-0 z-[75] flex justify-end bg-slate-950/35 backdrop-blur-sm" onClick={() => setSelectedOrganization(null)}>
-          <aside className="flex h-full w-full max-w-2xl flex-col bg-slate-50 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <header className="border-b border-slate-200 bg-white p-4 sm:p-5">
+          <aside className="flex h-full w-full max-w-2xl flex-col bg-slate-50 shadow-2xl dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
+            <header className="border-b border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <Logo organization={selectedOrganization} />
@@ -429,12 +429,12 @@ export default function FormsInformationCenterPage() {
                     <h2 className="truncate text-xl font-semibold text-slate-950">{selectedOrganization.display_name}</h2>
                   </div>
                 </div>
-                <button type="button" onClick={() => setSelectedOrganization(null)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><X size={17} /></button>
+                <button type="button" onClick={() => setSelectedOrganization(null)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><X size={17} /></button>
               </div>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input value={formsSearch} onChange={(event) => setFormsSearch(event.target.value)} placeholder="Search forms, KYC, SIP..." className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" />
+                  <input value={formsSearch} onChange={(event) => setFormsSearch(event.target.value)} placeholder="Search forms, KYC, SIP..." className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:bg-slate-950" />
                 </div>
                 {canManageForms && <button type="button" onClick={() => editForm()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"><Plus size={16} /> Add form link</button>}
               </div>
@@ -443,13 +443,13 @@ export default function FormsInformationCenterPage() {
               {formsLoading ? (
                 <p className="py-12 text-center text-sm text-slate-500">Loading forms...</p>
               ) : visibleForms.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900">
                   <FileStack size={24} className="mx-auto text-slate-300" />
                   <p className="mt-2 text-sm font-semibold text-slate-700">No form links found.</p>
                   <p className="mt-1 text-xs text-slate-500">Admins can add direct links for commonly used forms.</p>
                 </div>
               ) : visibleForms.map((form) => (
-                <article key={form.id} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md ${!form.active ? "opacity-55" : ""}`}>
+                <article key={form.id} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-400/50 ${!form.active ? "opacity-55" : ""}`}>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">{form.category || "General"}</span>
@@ -459,8 +459,8 @@ export default function FormsInformationCenterPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       {canManageForms && (
                         <>
-                          <CrmTooltip content="Edit form link"><button type="button" onClick={() => editForm(form)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><Pencil size={15} /></button></CrmTooltip>
-                          {admin && <CrmTooltip content="Archive form link"><button type="button" onClick={() => setArchiveTarget({ kind: "form", item: form })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button></CrmTooltip>}
+                          <CrmTooltip content="Edit form link"><button type="button" onClick={() => editForm(form)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil size={15} /></button></CrmTooltip>
+                          {admin && <CrmTooltip content="Archive form link"><button type="button" onClick={() => setArchiveTarget({ kind: "form", item: form })} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 dark:border-red-400/35 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/25"><Trash2 size={15} /></button></CrmTooltip>}
                         </>
                       )}
                       <ExternalButton onClick={() => openExternal(form.form_url, selectedOrganization.id)}>Open form <ExternalLink size={14} /></ExternalButton>
@@ -512,14 +512,14 @@ export default function FormsInformationCenterPage() {
 function EditorModal({ title, onClose, onSubmit, saving, children }) {
   return (
     <div className="fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
-      <form onSubmit={onSubmit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/60 bg-white p-5 shadow-2xl sm:p-6">
+      <form onSubmit={onSubmit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/60 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><X size={17} /></button>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><X size={17} /></button>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800">Cancel</button>
           <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">{saving ? "Saving..." : "Save"}</button>
         </div>
       </form>
@@ -529,7 +529,7 @@ function EditorModal({ title, onClose, onSubmit, saving, children }) {
 
 function ActiveToggle({ checked, onChange }) {
   return (
-    <label className="flex items-center gap-3 self-end rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+    <label className="flex items-center gap-3 self-end rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-emerald-600" />
       Active and visible
     </label>

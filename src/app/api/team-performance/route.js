@@ -26,7 +26,11 @@ export async function GET(request) {
     taskDb.from("task_activity_logs").select("id, task_id, action_type, performed_by, metadata, created_at"),
     taskDb.from("profiles").select("id, name, full_name, email, designation, role, is_active, status"),
     taskDb.from("clients").select("id, full_name").order("full_name"),
-    taskDb.from("operation_self_tasks").select("id, created_by, status, is_archived, task_date"),
+    taskDb
+      .from("operation_self_tasks")
+      .select("id, created_by, status, priority, is_archived, task_date, client_name, task_description, remark, done_by, created_at, updated_at")
+      .order("task_date", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   const error = [tasksRes, assignmentsRes, activityRes, profilesRes, clientsRes, selfTasksRes].find((result) => result.error)?.error;

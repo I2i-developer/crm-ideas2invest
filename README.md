@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment
+
+Meeting Notes AI summarization uses Groq on the server:
+
+```bash
+GROQ_API_KEY=your_groq_api_key
+GROQ_MEETING_SUMMARY_MODEL=llama-3.3-70b-versatile
+```
+
+`GROQ_MEETING_SUMMARY_MODEL` is optional. If `GROQ_API_KEY` is missing or the Groq request fails, the CRM uses the local fallback meeting-summary extractor.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

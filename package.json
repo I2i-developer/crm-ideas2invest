@@ -29,6 +29,7 @@
     "react-hot-toast": "^2.6.0",
     "react-select": "^5.10.2",
     "react-tooltip": "^5.30.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },

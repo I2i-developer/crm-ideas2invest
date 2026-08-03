@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import CrmTooltip from "@/components/CrmTooltip";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 
-export default function NotificationIcon() {
+export default function NotificationIcon({ profile = null }) {
   const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -35,29 +35,19 @@ export default function NotificationIcon() {
     let mounted = true;
 
     async function subscribe() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!mounted || !user?.id) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("notifications")
-        .eq("id", user.id)
-        .maybeSingle();
+      if (!mounted || !profile?.id) return;
 
       toastEnabledRef.current = profile?.notifications?.real_time_toasts !== false;
 
       channel = supabase
-        .channel(`task-notifications:${user.id}`)
+        .channel(`task-notifications:${profile.id}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "task_notifications",
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${profile.id}`,
           },
           (payload) => {
             fetchNotifications();
@@ -82,7 +72,7 @@ export default function NotificationIcon() {
       mounted = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [fetchNotifications]);
+  }, [fetchNotifications, profile]);
 
   async function markAllRead() {
     await authFetch("/api/notifications", {

@@ -29,7 +29,7 @@ function formatSeenTime(value) {
   return value ? formatDateTimeDDMonYYYY(value, "") : "";
 }
 
-export default function ChatLauncher() {
+export default function ChatLauncher({ profile = null }) {
   const [open, setOpen] = useState(false);
   const [threads, setThreads] = useState([]);
   const [users, setUsers] = useState([]);
@@ -83,17 +83,17 @@ export default function ChatLauncher() {
   }, [loadThreads]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      const userId = data?.user?.id || null;
-      setCurrentUserId(userId);
-      if (userId) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
-        setCurrentRole(String(profile?.role || "").toLowerCase());
-      }
-    });
+    setCurrentUserId(profile?.id || null);
+    setCurrentRole(String(profile?.role || "").toLowerCase());
+  }, [profile]);
+
+  useEffect(() => {
     loadThreads();
-    loadUsers();
-  }, [loadThreads, loadUsers]);
+  }, [loadThreads]);
+
+  useEffect(() => {
+    if (open) loadUsers();
+  }, [loadUsers, open]);
 
   useEffect(() => {
     if (!activeThreadId) return;

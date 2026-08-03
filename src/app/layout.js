@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "i2i DocHub",
   description: "Ideas2Invest document and task management hub",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "i2i CRM",
+    statusBarStyle: "default",
+  },
   icons: {
     icon: [
       { url: "/icon.png", type: "image/png" },

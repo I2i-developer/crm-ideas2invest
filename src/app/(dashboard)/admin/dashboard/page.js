@@ -66,7 +66,7 @@ function displayUserName(data) {
 function GreetingTitle({ data }) {
   return (
     <>
-      <span className="text-emerald-300">{greetingForNow()},</span>{" "}
+      <span className="text-green-600">{greetingForNow()},</span>{" "}
       <span className="text-blue-700">{displayUserName(data)}</span>
     </>
   );

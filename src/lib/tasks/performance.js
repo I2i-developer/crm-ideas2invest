@@ -122,7 +122,11 @@ export function summarizeTasks(tasks) {
 }
 
 function dateKey(value) {
-  return new Date(value).toISOString().slice(0, 10);
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 export function buildPerformanceReport({ tasks, assignments, activities, users, selfTasks, filters = {} }) {
@@ -148,8 +152,8 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
 
   const filtered = lifecycleTasks.filter((task) => {
     const assignedRows = task.assignments;
-    if (filters.status && task.status !== filters.status) return false;
-    if (filters.priority && task.priority !== filters.priority) return false;
+    if (filters.status && normalized(task.status) !== normalized(filters.status)) return false;
+    if (filters.priority && normalized(task.priority) !== normalized(filters.priority)) return false;
     if (filters.client_id && task.client_id !== filters.client_id) return false;
     if (filters.due_from && (!task.due_date || task.due_date < filters.due_from)) return false;
     if (filters.due_to && (!task.due_date || task.due_date > filters.due_to)) return false;
@@ -159,9 +163,27 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
   });
 
   const uniqueTasks = [...new Map(filtered.map((task) => [task.id, task])).values()];
-  const operationsUsers = users.filter((user) => normalized(user.role) === "operations");
+  const operationsUsers = users
+    .filter((user) => normalized(user.role) === "operations")
+    .sort((a, b) => {
+      const nameA = a.name || a.full_name || a.email || "";
+      const nameB = b.name || b.full_name || b.email || "";
+      return nameA.localeCompare(nameB, "en", { sensitivity: "base" });
+    });
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const filteredSelfTasks = (selfTasks || []).filter((task) => {
+    if (task.is_archived) return false;
+    if (filters.user_id && task.created_by !== filters.user_id) return false;
+    if (filters.status && normalized(task.status) !== normalized(filters.status)) return false;
+    if (filters.priority && normalized(task.priority) !== normalized(filters.priority)) return false;
+    const taskDate = dateKey(task.task_date || task.created_at);
+    if (filters.date_from && (!taskDate || taskDate < filters.date_from)) return false;
+    if (filters.date_to && (!taskDate || taskDate > filters.date_to)) return false;
+    return true;
+  });
   const userRows = operationsUsers.map((user) => {
     const userTasks = filtered.filter((task) => task.assignments.some((assignment) => assignment.user_id === user.id));
+    const userSelfTasks = filteredSelfTasks.filter((task) => task.created_by === user.id);
     return {
       id: user.id,
       name: user.name || user.full_name || user.email || "Unnamed user",
@@ -169,8 +191,18 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
       ...summarizeTasks(userTasks),
       tasks: userTasks,
       self_activity: {
-        total: selfTasks.filter((task) => task.created_by === user.id && !task.is_archived).length,
-        done: selfTasks.filter((task) => task.created_by === user.id && task.status === "Done" && !task.is_archived).length,
+        total: userSelfTasks.length,
+        done: userSelfTasks.filter((task) => normalized(task.status) === "done").length,
+        pending: userSelfTasks.filter((task) => TASK_STATUS_GROUPS.pending.has(normalized(task.status))).length,
+        in_progress: userSelfTasks.filter((task) => normalized(task.status) === "in progress").length,
+        records: userSelfTasks.map((task) => ({
+          ...task,
+          owner: {
+            id: user.id,
+            name: user.name || user.full_name || user.email || "CRM User",
+            role: user.role,
+          },
+        })),
       },
       recent_activity: activities
         .filter((activity) => activity.performed_by === user.id)
@@ -192,6 +224,24 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
   return {
     summary: summarizeTasks(uniqueTasks),
     users: userRows,
+    self_tasks: filteredSelfTasks.map((task) => {
+      const owner = usersById.get(task.created_by);
+      return {
+        ...task,
+        owner: owner
+          ? {
+              id: owner.id,
+              name: owner.name || owner.full_name || owner.email || "CRM User",
+              role: owner.role,
+            }
+          : null,
+      };
+    }),
+    self_summary: {
+      open: filteredSelfTasks.filter((task) => !["done", "cancelled"].includes(normalized(task.status))).length,
+      done: filteredSelfTasks.filter((task) => normalized(task.status) === "done").length,
+      total: filteredSelfTasks.length,
+    },
     charts: {
       status_distribution: statusDistribution,
       assigned_by_user: Object.fromEntries(userRows.map((user) => [user.name, user.assigned])),

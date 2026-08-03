@@ -111,7 +111,7 @@ export default function ClientsPage() {
               event.preventDefault();
               window.location.assign("/admin/clients/new");
             }}
-            className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50"
+            className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50 dark:border dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-200 dark:hover:bg-blue-500/25"
           >
             + New Client
           </Link>
@@ -137,12 +137,12 @@ export default function ClientsPage() {
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             icon={<Search size={20} />}
-            inputClassName={`font-[inherit] text-gray-800 shadow-lg border-white/40 ${focused ? "shadow-xl bg-white/80" : ""}`}
+            inputClassName={`font-[inherit] text-gray-800 shadow-lg border-white/40 dark:border-slate-600 dark:text-slate-50 ${focused ? "shadow-xl bg-white/80 dark:bg-slate-900" : ""}`}
           />
         </div>
 
         {/* Client Count */}
-        <div className="glass-card px-6 py-3 text-[15px] font-medium text-gray-700">
+        <div className="glass-card px-6 py-3 text-[15px] font-medium text-gray-700 dark:text-slate-200">
           Total Clients: <span className="text-blue-600">{clients.length}</span>
         </div>
       </div>
@@ -167,7 +167,7 @@ export default function ClientsPage() {
             clients.map((client) => (
               <div
                 key={client.id}
-                className="flex justify-between items-center p-4 rounded-xl hover:bg-white/50 transition-all duration-200 group"
+                className="flex justify-between items-center p-4 rounded-xl hover:bg-white/50 transition-all duration-200 group dark:hover:bg-slate-800/85"
               >
                 <Link href={`/admin/clients/${client.id}`} className="flex items-center gap-4">
                   {/* Avatar */}
@@ -176,10 +176,10 @@ export default function ClientsPage() {
                   </div>
 
                   <div>
-                    <p className="font-medium text-gray-800">
+                    <p className="font-medium text-gray-800 dark:text-slate-50">
                       {client.full_name}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-slate-300">
                       {client.mobile} • {client.email}
                     </p>
                   </div>
@@ -190,7 +190,7 @@ export default function ClientsPage() {
                   <CrmTooltip content="View documents">
                     <Link
                       href={`/admin/clients/${client.id}`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 shadow-sm transition hover:bg-blue-100 group-hover:scale-105 group-hover:border-blue-300 group-hover:bg-blue-100 group-hover:text-blue-800 dark:border-blue-300/70 dark:bg-blue-400/30 dark:text-blue-50 dark:shadow-blue-950/30 dark:group-hover:border-blue-200 dark:group-hover:bg-blue-400/45 dark:hover:bg-blue-400/55"
                       aria-label={`View documents for ${client.full_name}`}
                     >
                       <Eye size={17} />
@@ -200,7 +200,7 @@ export default function ClientsPage() {
                   <CrmTooltip content="Complete client profile">
                     <Link
                       href={`/admin/clients/${client.id}/client-details`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 group-hover:scale-105 group-hover:border-emerald-300 group-hover:bg-emerald-100 group-hover:text-emerald-800 dark:border-emerald-300/70 dark:bg-emerald-400/30 dark:text-emerald-50 dark:shadow-emerald-950/30 dark:group-hover:border-emerald-200 dark:group-hover:bg-emerald-400/45 dark:hover:bg-emerald-400/55"
                       aria-label={`Open complete profile for ${client.full_name}`}
                     >
                       <ClipboardList size={17} />
@@ -212,7 +212,7 @@ export default function ClientsPage() {
                       <CrmTooltip content="Edit client">
                         <Link
                           href={`/admin/clients/${client.id}/edit`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 shadow-sm transition hover:bg-indigo-100 group-hover:scale-105 group-hover:border-indigo-300 group-hover:bg-indigo-100 group-hover:text-indigo-800 dark:border-indigo-300/70 dark:bg-indigo-400/30 dark:text-indigo-50 dark:shadow-indigo-950/30 dark:group-hover:border-indigo-200 dark:group-hover:bg-indigo-400/45 dark:hover:bg-indigo-400/55"
                           aria-label={`Edit ${client.full_name}`}
                         >
                           <Edit3 size={16} />
@@ -222,7 +222,7 @@ export default function ClientsPage() {
                       <CrmTooltip content="Delete client">
                         <button
                           onClick={() => handleDelete(client.id)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 group-hover:scale-105 group-hover:border-red-300 group-hover:bg-red-100 group-hover:text-red-800 dark:border-red-300/70 dark:bg-red-400/30 dark:text-red-50 dark:shadow-red-950/30 dark:group-hover:border-red-200 dark:group-hover:bg-red-400/45 dark:hover:bg-red-400/55"
                           aria-label={`Delete ${client.full_name}`}
                         >
                           <Trash2 size={16} />

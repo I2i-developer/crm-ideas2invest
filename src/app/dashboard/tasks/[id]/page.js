@@ -17,6 +17,7 @@ import {
   User,
   FileText,
   Link as LinkIcon,
+  PencilLine,
 } from "lucide-react";
 import styles from "./TaskDetail.module.css";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
@@ -150,7 +151,8 @@ export default function TaskDetailPage() {
 
         <div className={styles.headerRight}>
           {currentRole === "admin" && (
-            <Link href={`/dashboard/tasks/${id}/edit`} className={styles.backBtn}>
+            <Link href={`/dashboard/tasks/${id}/edit`} className={styles.editTaskBtn}>
+              <PencilLine size={16} />
               Edit Task
             </Link>
           )}
