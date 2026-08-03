@@ -29,12 +29,23 @@ function getDeviceLabel() {
   return "Browser";
 }
 
+function isIosBrowser() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+}
+
+function isStandaloneApp() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
 function getUnsupportedReason() {
   if (typeof window === "undefined") return "Loading";
+  if (!window.isSecureContext) return "Open the CRM on HTTPS. Mobile browsers do not allow web push on plain HTTP or a laptop LAN IP.";
   if (!("serviceWorker" in navigator)) return "Service workers are not supported in this browser.";
   if (!("PushManager" in window)) return "Push notifications are not supported in this browser.";
   if (!("Notification" in window)) return "Browser notifications are not supported.";
-  if (!window.isSecureContext) return "Web push requires HTTPS or localhost.";
+  if (isIosBrowser() && !isStandaloneApp()) {
+    return "On iPhone/iPad, add the CRM to the Home Screen and open it from there to enable web push.";
+  }
   return "";
 }
 
@@ -172,12 +183,13 @@ export default function WebPushToggle({ profile = null }) {
         <button
           type="button"
           onClick={enabled ? disablePush : enablePush}
-          disabled={busy || !supported || !configured || permission === "denied"}
+          disabled={busy}
+          aria-disabled={!enabled && (!supported || !configured || permission === "denied")}
           className={`inline-flex h-10 w-10 items-center justify-center transition sm:h-11 sm:w-11 ${
             enabled
               ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
               : "bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-          } disabled:cursor-not-allowed disabled:opacity-50`}
+          } ${!enabled && (!supported || !configured || permission === "denied") ? "opacity-60" : ""} disabled:cursor-wait disabled:opacity-70`}
           aria-label={enabled ? "Disable device alerts" : "Enable device alerts"}
         >
           <Icon size={19} className={busy ? "animate-spin" : ""} />
