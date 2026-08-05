@@ -50,6 +50,7 @@ export default function SettingsPage() {
 
   function applyTheme(darkMode) {
     document.documentElement.classList.toggle("dark", Boolean(darkMode));
+    document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
     localStorage.setItem("theme", darkMode ? "dark" : "light");
   }
 

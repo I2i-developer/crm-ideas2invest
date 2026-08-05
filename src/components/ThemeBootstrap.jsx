@@ -9,6 +9,7 @@ export default function ThemeBootstrap() {
   useEffect(() => {
     if (pathname === "/login") {
       document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
       return;
     }
 
@@ -16,6 +17,7 @@ export default function ThemeBootstrap() {
     const shouldUseDark = theme === "dark";
 
     document.documentElement.classList.toggle("dark", shouldUseDark);
+    document.documentElement.style.colorScheme = shouldUseDark ? "dark" : "light";
   }, [pathname]);
 
   return null;

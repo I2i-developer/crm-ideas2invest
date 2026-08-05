@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { authFetch } from "@/lib/authFetch";
 import toast from "react-hot-toast";
-import TaskForm from "../components/TaskForm";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import CommentSection from "../components/CommentSection";
 import Checklist from "../components/Checklist";
 import ActivityTimeline from "../components/ActivityTimeline";
@@ -18,6 +18,7 @@ import {
   FileText,
   Link as LinkIcon,
   PencilLine,
+  Trash2,
 } from "lucide-react";
 import styles from "./TaskDetail.module.css";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
@@ -51,9 +52,12 @@ const STATUS_OPTIONS = [
 
 export default function TaskDetailPage() {
   const { id } = useParams();
+  const router = useRouter();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentRole, setCurrentRole] = useState(null);
 
@@ -108,6 +112,21 @@ export default function TaskDetailPage() {
     setUpdating(false);
   }
 
+  async function handleDeleteTask() {
+    setDeleting(true);
+    const res = await authFetch(`/api/tasks/${id}`, { method: "DELETE" });
+    setDeleting(false);
+
+    if (res.ok) {
+      toast.success("Task deleted");
+      router.replace("/dashboard/tasks");
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    toast.error(data.error || "Task could not be deleted");
+  }
+
   if (loading) {
     return <div className={styles.loading}>Loading task details...</div>;
   }
@@ -151,10 +170,20 @@ export default function TaskDetailPage() {
 
         <div className={styles.headerRight}>
           {currentRole === "admin" && (
-            <Link href={`/dashboard/tasks/${id}/edit`} className={styles.editTaskBtn}>
-              <PencilLine size={16} />
-              Edit Task
-            </Link>
+            <div className={styles.adminActions}>
+              <Link href={`/dashboard/tasks/${id}/edit`} className={styles.editTaskBtn}>
+                <PencilLine size={16} />
+                Edit Task
+              </Link>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className={styles.deleteTaskBtn}
+              >
+                <Trash2 size={16} />
+                Delete Task
+              </button>
+            </div>
           )}
           <div className={styles.statusUpdate}>
             <label className={styles.statusLabel}>Update Status:</label>
@@ -309,6 +338,15 @@ export default function TaskDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete task?"
+        message={`This will remove "${task.title || "this task"}" from the CRM task queue. This action cannot be undone.`}
+        loading={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDeleteTask}
+      />
     </div>
   );
 }
