@@ -11,7 +11,6 @@ import HeaderBasicCalculator from "@/components/HeaderBasicCalculator";
 import OperationsQuickNotes from "@/components/OperationsQuickNotes";
 import HeaderDateTime from "@/components/HeaderDateTime";
 import NotificationIcon from "@/components/NotificationIcon";
-import WebPushToggle from "@/components/WebPushToggle";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function HeaderActions({ profile: profileProp = null }) {
@@ -55,12 +54,11 @@ export default function HeaderActions({ profile: profileProp = null }) {
   }
 
   return (
-    <div className="relative flex min-w-0 items-center gap-2 sm:gap-3">
+    <div className="relative ml-auto flex min-w-0 shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
       <HeaderDateTime />
       <HeaderBasicCalculator role={profile.role} />
       <OperationsQuickNotes role={profile.role} />
       <ChatLauncher profile={profile} />
-      <WebPushToggle profile={profile} />
       <NotificationIcon profile={profile} />
 
       <CrmTooltip content="Profile" side="bottom">

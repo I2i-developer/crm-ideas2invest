@@ -107,12 +107,12 @@ export default function AdminDashboard() {
     };
   }, [loadDashboard]);
 
-  if (loading) return <div className="p-6 text-gray-500">Loading dashboard...</div>;
+  if (loading) return <div className="p-2 text-gray-500 sm:p-6">Loading dashboard...</div>;
 
   const metrics = data?.metrics || {};
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-0 sm:p-6">
       <PageHeader
         eyebrow="Admin workspace"
         title={<GreetingTitle data={data} />}

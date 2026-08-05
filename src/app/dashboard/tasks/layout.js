@@ -1,14 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/app/(dashboard)/admin/components/Sidebar";
 import HeaderActions from "@/components/HeaderActions";
 import HeaderBrand from "@/components/HeaderBrand";
 import { Menu } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+
+const DEFAULT_PROFILE = {
+  name: "",
+  full_name: "",
+  email: "",
+  designation: "",
+  avatar_url: "",
+  role: "",
+  notifications: {},
+};
 
 export default function TasksLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+
+  const loadProfile = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("name, full_name, email, designation, avatar_url, role, notifications")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    setProfile({
+      id: user.id,
+      name: data?.name || data?.full_name || user.user_metadata?.full_name || user.email || "CRM User",
+      full_name: data?.full_name || "",
+      email: data?.email || user.email || "",
+      designation: data?.designation || "",
+      avatar_url: data?.avatar_url || "/images/profiles/default.png",
+      role: data?.role || "",
+      notifications: data?.notifications || {},
+    });
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -17,6 +59,7 @@ export default function TasksLayout({ children }) {
         setCollapsed={setCollapsed}
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
+        profile={profile}
       />
       <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
         <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-gray-50/95 px-2 sm:px-4 lg:px-4">
@@ -31,9 +74,9 @@ export default function TasksLayout({ children }) {
             </button>
             <HeaderBrand />
           </div>
-          <HeaderActions />
+          <HeaderActions profile={profile} />
         </header>
-        <main className="min-w-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">
           {children}
         </main>
       </div>

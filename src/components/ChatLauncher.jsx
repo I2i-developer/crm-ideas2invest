@@ -280,8 +280,8 @@ export default function ChatLauncher({ profile = null }) {
             className="fixed inset-0 z-40 cursor-default bg-transparent"
             onClick={() => setOpen(false)}
           />
-          <section className="fixed bottom-4 right-3 top-[4.5rem] z-50 flex w-[min(760px,calc(100vw-1.5rem))] overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl sm:right-5">
-            <aside className="flex w-72 shrink-0 flex-col border-r border-gray-100 bg-slate-50/70">
+          <section className="fixed inset-0 z-50 flex overflow-hidden bg-white shadow-2xl sm:bottom-4 sm:left-auto sm:right-5 sm:top-[4.5rem] sm:w-[min(760px,calc(100vw-1.5rem))] sm:rounded-3xl sm:border sm:border-gray-200">
+            <aside className={`${activeThread ? "hidden sm:flex" : "flex"} w-full shrink-0 flex-col border-r border-gray-100 bg-slate-50/70 sm:w-72`}>
               <div className="border-b border-gray-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -359,7 +359,7 @@ export default function ChatLauncher({ profile = null }) {
               </div>
             </aside>
 
-            <main className="flex min-w-0 flex-1 flex-col bg-white">
+            <main className={`${activeThread ? "flex" : "hidden sm:flex"} min-w-0 flex-1 flex-col bg-white`}>
               {activeThread ? (
                 <>
                   <div className="flex items-center justify-between border-b border-gray-100 p-4">
@@ -406,7 +406,7 @@ export default function ChatLauncher({ profile = null }) {
                         return (
                           <div key={message.id} className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                             {!mine && <Avatar name={senderName} small />}
-                            <div className={`group relative max-w-[78%] rounded-3xl px-4 py-2 shadow-sm ${
+                            <div className={`group relative max-w-[86%] rounded-3xl px-4 py-2 shadow-sm sm:max-w-[78%] ${
                               mine ? "bg-blue-600 text-white" : "border border-gray-100 bg-white text-gray-800"
                             }`}>
                               {!mine && <p className="mb-1 text-xs font-semibold text-blue-700">{senderName}</p>}
@@ -420,7 +420,7 @@ export default function ChatLauncher({ profile = null }) {
                                     value={editBody}
                                     onChange={(event) => setEditBody(event.target.value)}
                                     rows={2}
-                                    className="w-full min-w-[220px] resize-none rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none"
+                                  className="w-full min-w-[min(220px,70vw)] resize-none rounded-2xl border border-blue-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none"
                                   />
                                   <div className="flex justify-end gap-2">
                                     <button
@@ -463,7 +463,7 @@ export default function ChatLauncher({ profile = null }) {
                                 )}
                               </div>
                               {(canEdit || canDelete) && editingMessageId !== message.id && (
-                                <div className={`absolute top-1 hidden gap-1 rounded-full border border-gray-100 bg-white p-1 shadow-lg group-hover:flex ${mine ? "-left-16" : "-right-16"}`}>
+                                <div className={`mt-2 flex justify-end gap-1 rounded-full border border-gray-100 bg-white p-1 shadow-lg sm:absolute sm:top-1 sm:mt-0 sm:hidden sm:group-hover:flex ${mine ? "sm:-left-16" : "sm:-right-16"}`}>
                                   {canEdit && (
                                     <button
                                       type="button"

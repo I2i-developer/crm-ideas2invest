@@ -49,7 +49,7 @@ function getUnsupportedReason() {
   return "";
 }
 
-export default function WebPushToggle({ profile = null }) {
+export default function WebPushToggle({ profile = null, variant = "icon" }) {
   const [supported, setSupported] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -176,6 +176,60 @@ export default function WebPushToggle({ profile = null }) {
   if (!profile?.id) return null;
 
   const Icon = busy ? Loader2 : enabled ? Smartphone : permission === "denied" ? BellOff : BellPlus;
+  const blocked = !enabled && (!supported || !configured || permission === "denied");
+
+  if (variant === "settings") {
+    return (
+      <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white/70 p-4">
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+              enabled ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+            }`}>
+              <Icon size={20} className={busy ? "animate-spin" : ""} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-800">Device push alerts</p>
+              <p className="mt-1 break-words text-sm leading-5 text-gray-500">
+                Receive CRM notifications on this browser even when the CRM is not open.
+              </p>
+              <p className={`mt-2 break-words text-xs font-semibold ${blocked ? "text-amber-700" : enabled ? "text-emerald-700" : "text-slate-500"}`}>
+                {enabled ? "Enabled on this device" : blocked ? tooltip : "Ready to enable on this device"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={enabled ? disablePush : enablePush}
+              disabled={busy}
+              aria-disabled={blocked}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition sm:w-auto ${
+                enabled
+                  ? "border border-red-100 bg-white text-red-600 hover:bg-red-50"
+                  : "bg-blue-700 text-white hover:bg-blue-800"
+              } ${blocked ? "opacity-75" : ""} disabled:cursor-wait disabled:opacity-70`}
+            >
+              <Icon size={16} className={busy ? "animate-spin" : ""} />
+              {enabled ? "Disable alerts" : "Enable alerts"}
+            </button>
+            {enabled && (
+              <button
+                type="button"
+                onClick={sendTestPush}
+                disabled={busy}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50 sm:w-auto"
+              >
+                <Send size={15} />
+                Send test
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <CrmTooltip content={tooltip} side="bottom">
@@ -184,12 +238,12 @@ export default function WebPushToggle({ profile = null }) {
           type="button"
           onClick={enabled ? disablePush : enablePush}
           disabled={busy}
-          aria-disabled={!enabled && (!supported || !configured || permission === "denied")}
+          aria-disabled={blocked}
           className={`inline-flex h-10 w-10 items-center justify-center transition sm:h-11 sm:w-11 ${
             enabled
               ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
               : "bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-          } ${!enabled && (!supported || !configured || permission === "denied") ? "opacity-60" : ""} disabled:cursor-wait disabled:opacity-70`}
+          } ${blocked ? "opacity-60" : ""} disabled:cursor-wait disabled:opacity-70`}
           aria-label={enabled ? "Disable device alerts" : "Enable device alerts"}
         >
           <Icon size={19} className={busy ? "animate-spin" : ""} />

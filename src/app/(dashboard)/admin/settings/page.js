@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/PageHeader";
+import WebPushToggle from "@/components/WebPushToggle";
 import { supabase } from "@/lib/supabaseClient";
 import FormInput from "../clients/components/FormInput";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
@@ -34,7 +35,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [profile, setProfile] = useState({
+    id: "",
     full_name: "",
+    email: "",
     designation: "",
     avatar_url: "",
     role: "operations",
@@ -163,7 +166,9 @@ export default function SettingsPage() {
 
     if (data) {
       setProfile({
+        id: userData.user.id,
         full_name: data.name || data.full_name || "",
+        email: data.email || userData.user.email || "",
         designation: data.designation || "",
         avatar_url: data.avatar_url || "",
         role: data.role || "operations",
@@ -306,7 +311,7 @@ export default function SettingsPage() {
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <SettingPanel
           icon={Sparkles}
           title="Profile"
@@ -365,6 +370,18 @@ export default function SettingsPage() {
         title="Notification Rules"
         description="Choose which CRM workflow alerts should stay visible for your profile."
       >
+        <div className="mb-4">
+          <WebPushToggle
+            profile={{
+              id: profile.id,
+              name: profile.full_name,
+              email: profile.email,
+              role: profile.role,
+            }}
+            variant="settings"
+          />
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2">
           <ToggleRow
             label="Task assignments"
@@ -432,7 +449,7 @@ export default function SettingsPage() {
 
 function SettingPanel({ icon: Icon, title, description, children }) {
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white/80 p-5 shadow-sm backdrop-blur">
+    <section className="min-w-0 rounded-3xl border border-gray-100 bg-white/80 p-4 shadow-sm backdrop-blur sm:p-5">
       <div className="mb-5 flex items-start gap-3">
         <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
           <Icon size={20} />
@@ -449,7 +466,7 @@ function SettingPanel({ icon: Icon, title, description, children }) {
 
 function ToggleRow({ label, description, checked, onChange }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white/70 p-4">
+    <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-gray-100 bg-white/70 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="font-semibold text-gray-800">{label}</p>
         {description && <p className="mt-1 text-sm leading-5 text-gray-500">{description}</p>}
@@ -458,7 +475,7 @@ function ToggleRow({ label, description, checked, onChange }) {
       <button
         type="button"
         onClick={onChange}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-all duration-200 ${
+        className={`relative h-7 w-12 shrink-0 self-start rounded-full transition-all duration-200 sm:self-auto ${
           checked ? "bg-blue-600" : "bg-gray-300"
         }`}
         aria-pressed={checked}
@@ -491,52 +508,104 @@ function ManualUploadsTable({ uploads, loading }) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-[900px] w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
-            <th className="py-3 pr-4">Upload type</th>
-            <th className="py-3 pr-4">File</th>
-            <th className="py-3 pr-4">Uploaded by</th>
-            <th className="py-3 pr-4">Last uploaded</th>
-            <th className="py-3 pr-4">Rows</th>
-            <th className="py-3 pr-4">Status</th>
-            <th className="py-3 pr-4">Source</th>
-            <th className="py-3">Module</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {uploads.map((upload) => (
-            <tr key={upload.key} className="align-top">
-              <td className="py-3 pr-4 font-semibold text-gray-900">{upload.type}</td>
-              <td className="max-w-[220px] truncate py-3 pr-4 text-gray-700">{upload.fileName}</td>
-              <td className="py-3 pr-4 text-gray-600">{upload.uploadedByName}</td>
-              <td className="py-3 pr-4 text-gray-600">{formatUploadTime(upload.uploadedAt)}</td>
-              <td className="py-3 pr-4 text-gray-600">
-                {upload.totalRows === null || upload.totalRows === undefined ? "-" : (
-                  <span>
-                    {upload.totalRows} total
-                    <span className="block text-xs text-gray-400">
-                      {upload.newRecords || 0} new / {upload.duplicates || 0} dup / {upload.failedRows || 0} failed
+    <>
+      <div className="grid gap-3 md:hidden">
+        {uploads.map((upload) => (
+          <article key={upload.key} className="min-w-0 rounded-2xl border border-gray-100 bg-white/80 p-4 text-sm shadow-sm">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900">{upload.type}</p>
+                <p className="mt-1 break-words text-gray-600">{upload.fileName}</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold capitalize text-blue-700">
+                {String(upload.status || "uploaded").replaceAll("_", " ")}
+              </span>
+            </div>
+
+            <dl className="mt-4 grid gap-3 text-xs text-gray-500">
+              <div className="min-w-0">
+                <dt className="font-semibold uppercase tracking-wide text-gray-400">Uploaded by</dt>
+                <dd className="mt-1 break-words text-sm text-gray-700">{upload.uploadedByName}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="font-semibold uppercase tracking-wide text-gray-400">Last uploaded</dt>
+                <dd className="mt-1 text-sm text-gray-700">{formatUploadTime(upload.uploadedAt)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="font-semibold uppercase tracking-wide text-gray-400">Rows</dt>
+                <dd className="mt-1 text-sm text-gray-700">
+                  {upload.totalRows === null || upload.totalRows === undefined ? "-" : (
+                    <>
+                      {upload.totalRows} total
+                      <span className="block text-xs text-gray-400">
+                        {upload.newRecords || 0} new / {upload.duplicates || 0} dup / {upload.failedRows || 0} failed
+                      </span>
+                    </>
+                  )}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="font-semibold uppercase tracking-wide text-gray-400">Source</dt>
+                <dd className="mt-1 break-words text-sm text-gray-700">{String(upload.sourceType || "manual").replaceAll("_", " ")}</dd>
+              </div>
+            </dl>
+
+            <a href={upload.href} className="mt-4 inline-flex font-semibold text-blue-700 hover:underline">
+              Open module
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <div className="hidden md:block">
+        <div className="max-w-full overflow-x-auto">
+          <table className="min-w-[900px] w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                <th className="py-3 pr-4">Upload type</th>
+                <th className="py-3 pr-4">File</th>
+                <th className="py-3 pr-4">Uploaded by</th>
+                <th className="py-3 pr-4">Last uploaded</th>
+                <th className="py-3 pr-4">Rows</th>
+                <th className="py-3 pr-4">Status</th>
+                <th className="py-3 pr-4">Source</th>
+                <th className="py-3">Module</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {uploads.map((upload) => (
+                <tr key={upload.key} className="align-top">
+                  <td className="py-3 pr-4 font-semibold text-gray-900">{upload.type}</td>
+                  <td className="max-w-[220px] truncate py-3 pr-4 text-gray-700">{upload.fileName}</td>
+                  <td className="py-3 pr-4 text-gray-600">{upload.uploadedByName}</td>
+                  <td className="py-3 pr-4 text-gray-600">{formatUploadTime(upload.uploadedAt)}</td>
+                  <td className="py-3 pr-4 text-gray-600">
+                    {upload.totalRows === null || upload.totalRows === undefined ? "-" : (
+                      <span>
+                        {upload.totalRows} total
+                        <span className="block text-xs text-gray-400">
+                          {upload.newRecords || 0} new / {upload.duplicates || 0} dup / {upload.failedRows || 0} failed
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold capitalize text-blue-700">
+                      {String(upload.status || "uploaded").replaceAll("_", " ")}
                     </span>
-                  </span>
-                )}
-              </td>
-              <td className="py-3 pr-4">
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold capitalize text-blue-700">
-                  {String(upload.status || "uploaded").replaceAll("_", " ")}
-                </span>
-              </td>
-              <td className="py-3 pr-4 text-gray-600">{String(upload.sourceType || "manual").replaceAll("_", " ")}</td>
-              <td className="py-3">
-                <a href={upload.href} className="font-semibold text-blue-700 hover:underline">
-                  Open
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                  </td>
+                  <td className="py-3 pr-4 text-gray-600">{String(upload.sourceType || "manual").replaceAll("_", " ")}</td>
+                  <td className="py-3">
+                    <a href={upload.href} className="font-semibold text-blue-700 hover:underline">
+                      Open
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
