@@ -163,20 +163,30 @@ export async function POST(request, { params }) {
       ? await db.from("profiles").select("id, role").in("id", recipients)
       : { data: [] };
     const roleByRecipient = new Map((recipientProfiles || []).map((item) => [item.id, item.role]));
-    await Promise.all(
+    const senderName = profile?.name || profile?.full_name || user.email || "CRM user";
+    const notificationResults = await Promise.all(
       recipients.map((userId) =>
         createNotification(db, {
           userId,
-          title: `New message from ${profile?.name || user.email || "CRM user"}`,
+          title: `New message from ${senderName}`,
           message: messageBody.length > 120 ? `${messageBody.slice(0, 117)}...` : messageBody,
           type: "chat_message",
           entityType: "chat_thread",
           entityId: threadId,
           linkUrl: `${roleByRecipient.get(userId) === "operations" ? "/operations/dashboard" : "/admin/dashboard"}?chat=${threadId}`,
-          metadata: { thread_id: threadId },
+          metadata: { thread_id: threadId, message_id: message.id, sender_id: user.id },
+          dedupeKey: `chat_message:${message.id}:${userId}`,
         })
       )
     );
+
+    if (notificationResults.some((notification) => !notification)) {
+      console.warn("Chat message notification missing for one or more recipients", {
+        thread_id: threadId,
+        message_id: message.id,
+        recipient_count: recipients.length,
+      });
+    }
 
     const [enrichedMessage] = await enrichMessages(db, [message]);
     return NextResponse.json({ message: enrichedMessage }, { status: 201 });

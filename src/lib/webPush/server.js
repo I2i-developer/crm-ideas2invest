@@ -12,7 +12,8 @@ export function isWebPushConfigured() {
 }
 
 export function configureWebPush() {
-  if (configured || !isWebPushConfigured()) return false;
+  if (configured) return true;
+  if (!isWebPushConfigured()) return false;
 
   webpush.setVapidDetails(
     `mailto:${process.env.WEB_PUSH_CONTACT_EMAIL}`,
@@ -56,25 +57,38 @@ async function disableSubscription(db, subscriptionId, error) {
 }
 
 export async function sendWebPushForNotification(supabase, notification) {
-  if (!notification?.user_id || !configureWebPush()) return;
+  const result = {
+    configured: false,
+    attempted: 0,
+    sent: 0,
+    failed: 0,
+    disabled: 0,
+    errors: [],
+  };
+
+  if (!notification?.user_id) return result;
+  if (!configureWebPush()) return result;
+  result.configured = true;
 
   const db = getTaskDataClient(supabase);
   const { data: subscriptions, error } = await db
     .from("web_push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
+    .select("id, endpoint, p256dh, auth, failure_count")
     .eq("user_id", notification.user_id)
     .eq("enabled", true);
 
   if (error) {
     console.error("Web push subscription lookup failed:", error.message);
-    return;
+    result.errors.push(error.message);
+    return result;
   }
 
-  if (!subscriptions?.length) return;
+  if (!subscriptions?.length) return result;
 
   const payload = buildPushPayload(notification);
+  result.attempted = subscriptions.length;
 
-  await Promise.allSettled(
+  const deliveries = await Promise.allSettled(
     subscriptions.map(async (row) => {
       const pushSubscription = {
         endpoint: row.endpoint,
@@ -85,7 +99,10 @@ export async function sendWebPushForNotification(supabase, notification) {
       };
 
       try {
-        await webpush.sendNotification(pushSubscription, payload);
+        await webpush.sendNotification(pushSubscription, payload, {
+          TTL: 60 * 60 * 24,
+          urgency: notification.notification_type === "chat_message" ? "high" : "normal",
+        });
         await db
           .from("web_push_subscriptions")
           .update({
@@ -95,21 +112,38 @@ export async function sendWebPushForNotification(supabase, notification) {
             failed_at: null,
           })
           .eq("id", row.id);
+        return { sent: true };
       } catch (error) {
         if (error?.statusCode === 404 || error?.statusCode === 410) {
           await disableSubscription(db, row.id, error);
-          return;
+          return { disabled: true, error: error?.message || "Subscription expired" };
         }
 
         await db
           .from("web_push_subscriptions")
           .update({
             failed_at: new Date().toISOString(),
-            failure_count: 1,
+            failure_count: Number(row.failure_count || 0) + 1,
           })
           .eq("id", row.id);
         console.error("Web push send failed:", error?.message || error);
+        return { failed: true, error: error?.message || "Web push send failed" };
       }
     })
   );
+
+  deliveries.forEach((delivery) => {
+    if (delivery.status === "rejected") {
+      result.failed += 1;
+      result.errors.push(delivery.reason?.message || "Web push delivery rejected");
+      return;
+    }
+
+    if (delivery.value?.sent) result.sent += 1;
+    if (delivery.value?.disabled) result.disabled += 1;
+    if (delivery.value?.failed) result.failed += 1;
+    if (delivery.value?.error) result.errors.push(delivery.value.error);
+  });
+
+  return result;
 }

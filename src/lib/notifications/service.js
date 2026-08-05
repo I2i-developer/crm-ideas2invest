@@ -42,9 +42,18 @@ export async function createNotification(
   }
 
   if (data) {
-    sendWebPushForNotification(supabase, data).catch((pushError) => {
+    try {
+      const pushResult = await sendWebPushForNotification(supabase, data);
+      if (pushResult?.failed || pushResult?.disabled) {
+        console.warn("Web push delivery issue:", {
+          notification_id: data.id,
+          user_id: data.user_id,
+          ...pushResult,
+        });
+      }
+    } catch (pushError) {
       console.error("Web push delivery failed:", pushError?.message || pushError);
-    });
+    }
   }
 
   return data;
