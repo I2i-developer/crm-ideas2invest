@@ -21,7 +21,7 @@ function urlBase64ToUint8Array(base64String) {
 
 function getDeviceLabel() {
   const userAgent = navigator.userAgent || "";
-  if (/iPhone|iPad|iPod/i.test(userAgent)) return "iOS Safari";
+  if (isIosBrowser()) return "iOS Safari";
   if (/Android/i.test(userAgent)) return "Android Browser";
   if (/Edg/i.test(userAgent)) return "Microsoft Edge";
   if (/Chrome/i.test(userAgent)) return "Chrome";
@@ -30,21 +30,36 @@ function getDeviceLabel() {
 }
 
 function isIosBrowser() {
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  const userAgent = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(userAgent) || (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1);
 }
 
 function isStandaloneApp() {
   return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
 }
 
+function getIosPushInstallReason() {
+  return "On iPhone/iPad, open Safari, tap Share, choose Add to Home Screen, then open the CRM from that Home Screen icon to enable push alerts.";
+}
+
 function getUnsupportedReason() {
   if (typeof window === "undefined") return "Loading";
   if (!window.isSecureContext) return "Open the CRM on HTTPS. Mobile browsers do not allow web push on plain HTTP or a laptop LAN IP.";
   if (!("serviceWorker" in navigator)) return "Service workers are not supported in this browser.";
-  if (!("PushManager" in window)) return "Push notifications are not supported in this browser.";
-  if (!("Notification" in window)) return "Browser notifications are not supported.";
   if (isIosBrowser() && !isStandaloneApp()) {
-    return "On iPhone/iPad, add the CRM to the Home Screen and open it from there to enable web push.";
+    return getIosPushInstallReason();
+  }
+  if (!("PushManager" in window)) {
+    if (isIosBrowser()) {
+      return "This iPhone/iPad does not expose web push here. Use iOS/iPadOS 16.4 or later and open the CRM from its Home Screen icon.";
+    }
+    return "Push notifications are not supported in this browser.";
+  }
+  if (!("Notification" in window)) {
+    if (isIosBrowser()) {
+      return "This iPhone/iPad does not expose notification permission here. Use iOS/iPadOS 16.4 or later and open the CRM from its Home Screen icon.";
+    }
+    return "Browser notifications are not supported.";
   }
   return "";
 }
