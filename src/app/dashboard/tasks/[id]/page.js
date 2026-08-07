@@ -13,6 +13,7 @@ import Checklist from "../components/Checklist";
 import ActivityTimeline from "../components/ActivityTimeline";
 import {
   ArrowLeft,
+  CalendarClock,
   Clock,
   User,
   FileText,
@@ -21,7 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import styles from "./TaskDetail.module.css";
-import { formatDateDDMonYYYY } from "@/lib/dateFormat";
+import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 
 const PRIORITY_COLORS = {
   Low: "#10b981",
@@ -256,6 +257,16 @@ export default function TaskDetailPage() {
                   </div>
                 </div>
               )}
+
+              <div className={styles.detailItem}>
+                <CalendarClock size={16} className={styles.detailIcon} />
+                <div>
+                  <span className={styles.detailLabel}>Created At</span>
+                  <span className={styles.detailValue}>
+                    {formatDateTimeDDMonYYYY(task.created_at, "Not available")}
+                  </span>
+                </div>
+              </div>
 
               <div className={styles.detailItem}>
                 <User size={16} className={styles.detailIcon} />

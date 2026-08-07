@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCheck, Pencil, MessageCircle, MessagesSquare, Search, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, CheckCheck, Pencil, MessagesSquare, Search, Send, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
@@ -55,6 +55,28 @@ export default function ChatLauncher({ profile = null }) {
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const filteredUsers = users.filter((user) =>
     [user.name, user.email, user.role].filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase())
+  );
+  const directThreadByUserId = useMemo(() => {
+    const map = new Map();
+
+    threads.forEach((thread) => {
+      if (thread.thread_type !== "direct") return;
+      const otherMember = (thread.members || []).find((member) => member.user_id !== currentUserId);
+      if (otherMember?.user_id) map.set(otherMember.user_id, thread);
+    });
+
+    return map;
+  }, [currentUserId, threads]);
+  const visibleUsers = useMemo(
+    () => filteredUsers.map((user) => ({
+      ...user,
+      thread: directThreadByUserId.get(user.id) || null,
+    })),
+    [directThreadByUserId, filteredUsers]
+  );
+  const groupThreads = useMemo(
+    () => threads.filter((thread) => thread.thread_type === "group"),
+    [threads]
   );
 
   const loadThreads = useCallback(async () => {
@@ -155,6 +177,16 @@ export default function ChatLauncher({ profile = null }) {
     await loadThreads();
     setActiveThreadId(data.thread.id);
     setQuery("");
+  }
+
+  async function openUserChat(user) {
+    if (user.thread?.id) {
+      setActiveThreadId(user.thread.id);
+      setQuery("");
+      return;
+    }
+
+    await startThread(user.id);
   }
 
   async function sendMessage(event) {
@@ -304,58 +336,73 @@ export default function ChatLauncher({ profile = null }) {
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                {query ? (
-                  <div className="space-y-2">
-                    {filteredUsers.map((user) => (
+                <div className="space-y-2">
+                  <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Users</p>
+                  {visibleUsers.map((user) => {
+                    const thread = user.thread;
+                    const active = thread?.id && activeThreadId === thread.id;
+                    const preview = thread?.last_message?.deleted_at
+                      ? "This message was deleted"
+                      : thread?.last_message?.body || user.email || "Start a new conversation";
+
+                    return (
                       <button
                         key={user.id}
                         type="button"
-                        onClick={() => startThread(user.id)}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 text-left hover:border-blue-200 hover:bg-blue-50"
-                      >
-                        <Avatar name={user.name} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-gray-900">{user.name}</span>
-                          <span className="block truncate text-xs capitalize text-gray-500">{user.role}</span>
-                        </span>
-                      </button>
-                    ))}
-                    {filteredUsers.length === 0 && <p className="p-3 text-sm text-gray-500">No users found.</p>}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {threads.map((thread) => (
-                      <button
-                        key={thread.id}
-                        type="button"
-                        onClick={() => setActiveThreadId(thread.id)}
+                        onClick={() => openUserChat(user)}
                         className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition ${
-                          activeThreadId === thread.id ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-white hover:bg-gray-50"
+                          active ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50"
                         }`}
                       >
-                        <Avatar name={thread.display_title} />
+                        <Avatar name={user.name} />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-semibold text-gray-900">{thread.display_title}</span>
-                            {thread.unread_count > 0 && (
+                            <span className="truncate text-sm font-semibold text-gray-900">{user.name}</span>
+                            {thread?.unread_count > 0 && (
                               <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white">
                                 {thread.unread_count}
                               </span>
                             )}
                           </span>
-                          <span className="mt-1 block truncate text-xs text-gray-500">
-                            {thread.last_message?.deleted_at ? "This message was deleted" : thread.last_message?.body || "No messages yet"}
-                          </span>
+                          <span className="mt-0.5 block truncate text-xs capitalize text-gray-500">{user.role}</span>
+                          <span className="mt-1 block truncate text-xs text-gray-500">{preview}</span>
                         </span>
                       </button>
-                    ))}
-                    {threads.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
-                        No conversations yet. Search a teammate to start one.
-                      </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  })}
+                  {visibleUsers.length === 0 && <p className="p-3 text-sm text-gray-500">No users found.</p>}
+
+                  {!query && groupThreads.length > 0 && (
+                    <div className="space-y-2 pt-3">
+                      <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Groups</p>
+                      {groupThreads.map((thread) => (
+                        <button
+                          key={thread.id}
+                          type="button"
+                          onClick={() => setActiveThreadId(thread.id)}
+                          className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition ${
+                            activeThreadId === thread.id ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <Avatar name={thread.display_title} />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="truncate text-sm font-semibold text-gray-900">{thread.display_title}</span>
+                              {thread.unread_count > 0 && (
+                                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                                  {thread.unread_count}
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-1 block truncate text-xs text-gray-500">
+                              {thread.last_message?.deleted_at ? "This message was deleted" : thread.last_message?.body || "No messages yet"}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </aside>
 

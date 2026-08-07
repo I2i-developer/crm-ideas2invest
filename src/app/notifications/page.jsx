@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
@@ -15,25 +15,66 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dismissingNotificationIds, setDismissingNotificationIds] = useState(() => new Set());
+  const hiddenNotificationIdsRef = useRef(new Set());
+  const hideTimersRef = useRef(new Map());
+  const removeTimersRef = useRef(new Map());
 
   async function loadNotifications() {
     setLoading(true);
     const response = await authFetch("/api/notifications");
     const data = await response.json();
     if (response.ok) {
-      setNotifications(data.notifications || []);
+      setNotifications((data.notifications || []).filter((notification) => !hiddenNotificationIdsRef.current.has(notification.id)));
       setUnreadCount(data.unread_count || 0);
     }
     setLoading(false);
   }
 
+  function scheduleNotificationRemoval(notificationId) {
+    const existingHideTimer = hideTimersRef.current.get(notificationId);
+    const existingRemoveTimer = removeTimersRef.current.get(notificationId);
+    if (existingHideTimer) clearTimeout(existingHideTimer);
+    if (existingRemoveTimer) clearTimeout(existingRemoveTimer);
+
+    const timerId = setTimeout(() => {
+      setDismissingNotificationIds((current) => new Set(current).add(notificationId));
+      hideTimersRef.current.delete(notificationId);
+
+      const removeTimerId = setTimeout(() => {
+        hiddenNotificationIdsRef.current.add(notificationId);
+        setNotifications((current) => current.filter((notification) => notification.id !== notificationId));
+        setDismissingNotificationIds((current) => {
+          const next = new Set(current);
+          next.delete(notificationId);
+          return next;
+        });
+        removeTimersRef.current.delete(notificationId);
+      }, 350);
+
+      removeTimersRef.current.set(notificationId, removeTimerId);
+    }, 2000);
+
+    hideTimersRef.current.set(notificationId, timerId);
+  }
+
   async function markRead(notificationId) {
-    await authFetch("/api/notifications", {
+    const notification = notifications.find((item) => item.id === notificationId);
+    const response = await authFetch("/api/notifications", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notification_id: notificationId }),
     });
-    loadNotifications();
+
+    if (!response.ok) return;
+
+    setNotifications((current) =>
+      current.map((item) => item.id === notificationId ? { ...item, is_read: true } : item)
+    );
+    if (notification && !notification.is_read) {
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+    scheduleNotificationRemoval(notificationId);
   }
 
   async function markAllRead() {
@@ -59,6 +100,13 @@ export default function NotificationsPage() {
     loadNotifications();
   }, []);
 
+  useEffect(() => () => {
+    hideTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    removeTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    hideTimersRef.current.clear();
+    removeTimersRef.current.clear();
+  }, []);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -77,8 +125,16 @@ export default function NotificationsPage() {
         ) : notifications.length === 0 ? (
           <p className="text-sm text-gray-500">No notifications.</p>
         ) : (
-          notifications.map((notification) => (
-            <div key={notification.id} className={`rounded-xl border bg-white p-4 ${notification.is_read ? "opacity-70" : "border-blue-200"}`}>
+          notifications.map((notification) => {
+            const isDismissing = dismissingNotificationIds.has(notification.id);
+
+            return (
+            <div
+              key={notification.id}
+              className={`max-h-64 rounded-xl border bg-white p-4 transition-all duration-300 ease-in-out ${
+                notification.is_read ? "opacity-70" : "border-blue-200"
+              } ${isDismissing ? "max-h-0 translate-x-full scale-95 overflow-hidden border-transparent p-0 opacity-0" : ""}`}
+            >
               <div className="flex justify-between gap-4">
                 <button
                   type="button"
@@ -102,7 +158,8 @@ export default function NotificationsPage() {
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

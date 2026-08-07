@@ -15,14 +15,18 @@ export default function NotificationIcon({ profile = null }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [dismissingNotificationIds, setDismissingNotificationIds] = useState(() => new Set());
   const seenToastIds = useRef(new Set());
   const toastEnabledRef = useRef(true);
+  const hiddenNotificationIdsRef = useRef(new Set());
+  const hideTimersRef = useRef(new Map());
+  const removeTimersRef = useRef(new Map());
 
   const fetchNotifications = useCallback(async () => {
     const response = await authFetch("/api/notifications?recent_days=2");
     if (!response.ok) return;
     const data = await response.json();
-    setNotifications(data.notifications || []);
+    setNotifications((data.notifications || []).filter((notification) => !hiddenNotificationIdsRef.current.has(notification.id)));
     setUnreadCount(data.unread_count || 0);
   }, []);
 
@@ -74,6 +78,40 @@ export default function NotificationIcon({ profile = null }) {
     };
   }, [fetchNotifications, profile]);
 
+  useEffect(() => () => {
+    hideTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    removeTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+    hideTimersRef.current.clear();
+    removeTimersRef.current.clear();
+  }, []);
+
+  function scheduleNotificationRemoval(notificationId) {
+    const existingHideTimer = hideTimersRef.current.get(notificationId);
+    const existingRemoveTimer = removeTimersRef.current.get(notificationId);
+    if (existingHideTimer) clearTimeout(existingHideTimer);
+    if (existingRemoveTimer) clearTimeout(existingRemoveTimer);
+
+    const timerId = setTimeout(() => {
+      setDismissingNotificationIds((current) => new Set(current).add(notificationId));
+      hideTimersRef.current.delete(notificationId);
+
+      const removeTimerId = setTimeout(() => {
+        hiddenNotificationIdsRef.current.add(notificationId);
+        setNotifications((current) => current.filter((notification) => notification.id !== notificationId));
+        setDismissingNotificationIds((current) => {
+          const next = new Set(current);
+          next.delete(notificationId);
+          return next;
+        });
+        removeTimersRef.current.delete(notificationId);
+      }, 350);
+
+      removeTimersRef.current.set(notificationId, removeTimerId);
+    }, 2000);
+
+    hideTimersRef.current.set(notificationId, timerId);
+  }
+
   async function markAllRead() {
     await authFetch("/api/notifications", {
       method: "PUT",
@@ -85,12 +123,22 @@ export default function NotificationIcon({ profile = null }) {
   }
 
   async function markRead(notificationId) {
-    await authFetch("/api/notifications", {
+    const notification = notifications.find((item) => item.id === notificationId);
+    const response = await authFetch("/api/notifications", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notification_id: notificationId }),
     });
-    fetchNotifications();
+
+    if (!response.ok) return;
+
+    setNotifications((current) =>
+      current.map((item) => item.id === notificationId ? { ...item, is_read: true } : item)
+    );
+    if (notification && !notification.is_read) {
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+    scheduleNotificationRemoval(notificationId);
   }
 
   async function openNotification(notification) {
@@ -180,15 +228,18 @@ export default function NotificationIcon({ profile = null }) {
                   <p className="mt-1 text-xs text-gray-500">New tasks, documents, birthdays, and SIP alerts will appear here.</p>
                 </div>
               ) : (
-                notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`rounded-2xl border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                      notification.is_read
-                        ? "border-gray-100 bg-white"
-                        : "border-blue-200 bg-gradient-to-br from-blue-50 to-white"
-                    }`}
-                  >
+                notifications.map((notification) => {
+                  const isDismissing = dismissingNotificationIds.has(notification.id);
+
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`max-h-48 rounded-2xl border p-3 shadow-sm transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-md ${
+                        notification.is_read
+                          ? "border-gray-100 bg-white"
+                          : "border-blue-200 bg-gradient-to-br from-blue-50 to-white"
+                      } ${isDismissing ? "max-h-0 translate-x-full scale-95 overflow-hidden border-transparent p-0 opacity-0" : ""}`}
+                    >
                     <div className="flex items-start gap-3">
                       <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.is_read ? "bg-gray-300" : "bg-blue-600"}`} />
                       <button
@@ -221,7 +272,8 @@ export default function NotificationIcon({ profile = null }) {
                       )}
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
             <div className="border-t border-gray-100 p-3">
