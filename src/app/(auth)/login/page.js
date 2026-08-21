@@ -95,18 +95,25 @@ export default function LoginPage() {
 
       <section className="relative mx-auto grid h-dvh w-full max-w-6xl items-center gap-8 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:px-8">
         <div className="hidden lg:block">
-          <div className="inline-flex rounded-3xl border border-white/80 bg-white/80 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <Image
-              src="/images/logo/logo.png"
-              alt="Ideas2Invest"
-              width={172}
-              height={84}
-              priority
-              className="h-auto w-[172px] object-contain"
-            />
+          <div className="inline-flex items-center gap-4">
+            <div className="rounded-3xl border border-white/80 bg-white/80 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              <Image
+                src="/images/logo/logo.png"
+                alt="Ideas2Invest"
+                width={172}
+                height={84}
+                priority
+                className="h-auto w-[172px] object-contain"
+              />
+            </div>
+            <p className="max-w-none text-center text-[12px] uppercase font-semibold leading-4 text-slate-600">
+              <span className="whitespace-nowrap">AMFI-registered Mutual Funds Distributor</span>
+              <br />
+              ARN-113588
+            </p>
           </div>
 
-          <div className="mt-12 max-w-xl">
+          <div className="mt-6 max-w-xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm backdrop-blur">
               <ShieldCheck size={16} />
               Secure CRM Workspace
@@ -121,15 +128,20 @@ export default function LoginPage() {
         </div>
 
         <div className="mx-auto w-full max-w-[430px]">
-          <div className="mb-6 flex justify-center lg:hidden">
+          <div className="mb-6 flex items-center justify-center gap-2 lg:hidden">
             <Image
               src="/images/logo/logo.png"
               alt="Ideas2Invest"
               width={158}
               height={76}
               priority
-              className="h-auto w-[158px] object-contain"
+              className="h-auto w-[112px] shrink-0 object-contain sm:w-[138px]"
             />
+            <p className="max-w-none text-left text-[8px] font-semibold leading-3 text-slate-500 sm:text-[10px] sm:leading-4">
+              <span className="whitespace-nowrap">AMFI-registered Mutual Funds Distributor</span>
+              <br />
+              ARN-113588
+            </p>
           </div>
 
           <div className="rounded-[2rem] border border-white/85 bg-white/82 p-6 shadow-[0_28px_80px_rgba(15,23,42,0.12)] backdrop-blur-2xl">

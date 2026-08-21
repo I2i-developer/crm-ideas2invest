@@ -400,7 +400,9 @@ export default function CalculatorsPage() {
             @page { margin: 18mm; }
             body { font-family: Arial, sans-serif; margin: 0; color: #172033; background: #ffffff; }
             .header { display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 3px solid #2563eb; padding-bottom: 18px; margin-bottom: 24px; }
+            .brand { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 190px; text-align: center; }
             .logo { max-width: 150px; max-height: 78px; object-fit: contain; }
+            .amfi-label { color: #64748b; font-size: 10px; font-weight: 700; line-height: 1.35; text-transform: uppercase; letter-spacing: 0.04em; }
             .eyebrow { color: #2563eb; font-size: 12px; font-weight: 700; text-transform: uppercase; }
             h1 { margin: 6px 0 0; font-size: 28px; }
             h2 { margin-top: 28px; }
@@ -427,7 +429,10 @@ export default function CalculatorsPage() {
               <h1>${escapeHtml(active.name)}</h1>
               <div class="client">Prepared for: <strong>${escapeHtml(clientLabel)}</strong></div>
             </div>
-            <img class="logo" src="${logoUrl}" alt="Ideas2Invest" />
+            <div class="brand">
+              <img class="logo" src="${logoUrl}" alt="Ideas2Invest" />
+              <div class="amfi-label">AMFI-registered Mutual Funds Distributor</div>
+            </div>
           </div>
           <div class="result">
             <p>${escapeHtml(result.label)}</p>
