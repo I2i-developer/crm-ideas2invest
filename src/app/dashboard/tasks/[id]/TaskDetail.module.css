@@ -398,3 +398,59 @@
     flex: 1;
   }
 }
+
+:global(.dark) .title,
+:global(.dark) .cardTitle,
+:global(.dark) .detailValue,
+:global(.dark) .assigneeName {
+  color: #f8fafc;
+}
+
+:global(.dark) .backBtn,
+:global(.dark) .description,
+:global(.dark) .statusLabel,
+:global(.dark) .detailLabel,
+:global(.dark) .assigneeRole,
+:global(.dark) .noAssignees {
+  color: #cbd5e1;
+}
+
+:global(.dark) .taskNumber,
+:global(.dark) .detailIcon {
+  color: #94a3b8;
+}
+
+:global(.dark) .card {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(71, 85, 105, 0.78);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+:global(.dark) .cardTitle {
+  border-bottom-color: rgba(71, 85, 105, 0.7);
+}
+
+:global(.dark) .categoryBadge,
+:global(.dark) .attachmentItem,
+:global(.dark) .tag {
+  background: rgba(51, 65, 85, 0.72);
+  color: #cbd5e1;
+}
+
+:global(.dark) .statusSelect {
+  background: rgba(2, 6, 23, 0.45);
+  border-color: rgba(71, 85, 105, 0.85);
+  color: #f8fafc;
+}
+
+:global(.dark) .deleteTaskBtn {
+  background: rgba(127, 29, 29, 0.28);
+  border-color: rgba(251, 113, 133, 0.4);
+  color: #fecdd3;
+}
+
+:global(.dark) .deleteTaskBtn:hover {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: rgba(251, 113, 133, 0.55);
+  color: #ffe4e6;
+}

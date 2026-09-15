@@ -7,7 +7,7 @@
 
 .statCard {
   min-height: 82px;
-  background: #ffffff;
+  background: #f8fafc;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 14px;
@@ -87,4 +87,44 @@
   .statsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+:global(.dark) .statCard {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(71, 85, 105, 0.78);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+:global(.dark) .statValue {
+  color: #f8fafc;
+}
+
+:global(.dark) .statLabel {
+  color: #cbd5e1;
+}
+
+:global(.dark) .slate .statIcon,
+:global(.dark) .gray .statIcon {
+  color: #cbd5e1;
+  background: rgba(51, 65, 85, 0.72);
+}
+
+:global(.dark) .amber .statIcon {
+  color: #fcd34d;
+  background: rgba(146, 64, 14, 0.35);
+}
+
+:global(.dark) .blue .statIcon {
+  color: #93c5fd;
+  background: rgba(30, 64, 175, 0.35);
+}
+
+:global(.dark) .green .statIcon {
+  color: #6ee7b7;
+  background: rgba(6, 95, 70, 0.34);
+}
+
+:global(.dark) .red .statIcon {
+  color: #fda4af;
+  background: rgba(127, 29, 29, 0.4);
 }
