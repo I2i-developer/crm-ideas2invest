@@ -11,6 +11,7 @@ import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
 import DocumentViewer from "../../components/documents/DocumentViewer";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
 
 export default function CompleteClientInfo() {
@@ -227,7 +228,7 @@ export default function CompleteClientInfo() {
     );
   };
 
-  if (!client) return <p className="p-6">Loading...</p>;
+  if (!client) return <BrandLoader label="Loading client profile" />;
 
   const primaryHolder = holders.find((holder) => holder.holder_type === "primary") || holders[0] || {};
   let rawParsed = sessionParsedData || client.parsed_kyc || {};

@@ -15,6 +15,7 @@ import {
 import FormInput from "../../components/FormInput";
 import FormSelect from "../../components/FormSelect";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 
 export default function ClientDetails() {
 
@@ -109,13 +110,7 @@ export default function ClientDetails() {
     setEditMode(false);
   }
 
-  if (fetching) {
-    return (
-      <div className="p-6">
-        <p className="text-gray-500">Loading client profile...</p>
-      </div>
-    );
-  }
+  if (fetching) return <BrandLoader label="Loading client profile" />;
 
   if (!client) {
     return (

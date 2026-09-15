@@ -14,6 +14,7 @@ import KycSection from "./kyc/KycSection";
 import DocumentCard from "./documents/DocumentCard";
 import ParsedDataModal from "./modals/ParsedDataModal";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 import { FolderOpen } from "lucide-react";
 
 import { getDocumentRequirementInstances } from "@/lib/crm/onboardingRules";
@@ -289,7 +290,7 @@ export default function ClientDetails() {
     setParseLoading(false);
   };
 
-  if (loading) return <div className="p-6">Loading client data...</div>;
+  if (loading) return <BrandLoader label="Loading client data" />;
 
   return (
     <div className="p-6 space-y-8">

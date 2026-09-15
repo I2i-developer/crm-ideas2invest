@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import CommentSection from "../components/CommentSection";
 import Checklist from "../components/Checklist";
 import ActivityTimeline from "../components/ActivityTimeline";
+import BrandLoader from "@/components/BrandLoader";
 import {
   ArrowLeft,
   CalendarClock,
@@ -128,9 +129,7 @@ export default function TaskDetailPage() {
     toast.error(data.error || "Task could not be deleted");
   }
 
-  if (loading) {
-    return <div className={styles.loading}>Loading task details...</div>;
-  }
+  if (loading) return <BrandLoader label="Loading task details" />;
 
   if (!task) {
     return <div className={styles.notFound}>Task not found</div>;

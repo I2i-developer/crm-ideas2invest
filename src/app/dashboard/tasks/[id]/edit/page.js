@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import TaskForm from "../../components/TaskForm";
 import { ClipboardList } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 
 export default function EditTaskPage() {
   const { id } = useParams();
@@ -58,9 +59,7 @@ export default function EditTaskPage() {
     }
   }
 
-  if (loading) {
-    return <div style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>Loading...</div>;
-  }
+  if (loading) return <BrandLoader label="Loading task" />;
 
   if (!task) {
     return <div style={{ textAlign: "center", padding: "60px", color: "#64748b" }}>Task not found</div>;

@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import PageHeader from "@/components/PageHeader";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
+import BrandLoader from "@/components/BrandLoader";
 
 function birthdayHref(birthday) {
   return birthday.client_id ? `/admin/clients/${birthday.client_id}/client-details` : "/admin/birthdays";
@@ -134,7 +135,7 @@ export default function OperationsDashboard() {
     };
   }, [loadDashboard]);
 
-  if (loading) return <div className="p-2 text-gray-500 sm:p-6">Loading operations dashboard...</div>;
+  if (loading) return <BrandLoader label="Loading operations dashboard" />;
 
   const metrics = data?.metrics || {};
 

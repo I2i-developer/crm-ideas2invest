@@ -96,6 +96,10 @@ function extractSegment(text, labels, stopLabels = []) {
 }
 
 export default function TaskForm({ initialData = null, users = [], clients = [], onSubmit, isEdit = false }) {
+  const initialTags = Array.isArray(initialData?.tags)
+    ? initialData.tags.join(", ")
+    : initialData?.tags || "";
+
   const [form, setForm] = useState({
     title: initialData?.title || "",
     description: initialData?.description || "",
@@ -105,7 +109,8 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
     due_date: initialData?.due_date || "",
     client_id: initialData?.client_id || "",
     assigned_to: initialData?.task_assignments?.map((a) => a.user_id) || [],
-    tags: initialData?.tags?.join(", ") || "",
+    tags: initialTags,
+    source_sip_event_id: initialData?.source_sip_event_id || "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -197,6 +202,7 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
         client_id: form.client_id || null,
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         assigned_to: form.assigned_to,
+        source_sip_event_id: form.source_sip_event_id || null,
       };
 
       await onSubmit(payload);

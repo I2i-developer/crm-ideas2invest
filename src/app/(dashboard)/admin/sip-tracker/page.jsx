@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -78,6 +79,25 @@ function formatSipDate(value) {
 
 function sipEventDate(event) {
   return event.termination_date || event.end_date || event.start_date || event.sip_registration_date;
+}
+
+function buildSipTaskDescription(event) {
+  const frequency = String(event.frequency || "").trim().toUpperCase() === "D" ? "Daily" : event.frequency;
+  const contact = displayContact(event);
+  return [
+    `Investor: ${event.investor_name || event.clients?.full_name || "Unknown"}`,
+    `Event: SIP ${event.event_type || "follow-up"}`,
+    `Fund: ${event.fund || "-"}`,
+    `Scheme: ${event.scheme || "-"}`,
+    `Folio: ${event.folio_no || "-"}`,
+    `Amount: ${event.amount || "-"}`,
+    `Frequency: ${frequency || "-"}`,
+    `Date: ${formatSipDate(sipEventDate(event))}`,
+    `Mobile: ${contact.mobile || contact.phone || "-"}`,
+    `Email: ${event.email || event.clients?.email || "-"}`,
+    `Remarks: ${event.remarks || "-"}`,
+    `Rejection Remarks: ${event.rejection_remarks || "-"}`,
+  ].join("\n");
 }
 
 function chipClass(value) {
@@ -158,6 +178,7 @@ function SummaryCard({ title, value, icon: Icon, tone = "blue" }) {
 }
 
 export default function SipTrackerPage() {
+  const router = useRouter();
   const [role, setRole] = useState(null);
   const [events, setEvents] = useState([]);
   const [summary, setSummary] = useState({});
@@ -322,17 +343,21 @@ export default function SipTrackerPage() {
     await loadEvents();
   }
 
-  async function createTask(eventId) {
-    setRowBusy(eventId);
-    const response = await authFetch(`/api/sip-reports/${eventId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create_task" }),
+  function openCreateTask(event) {
+    const params = new URLSearchParams({
+      source: "sip_tracker",
+      source_sip_event_id: event.id,
+      title: `Follow up: SIP ${event.event_type || "event"} for ${event.investor_name || event.clients?.full_name || "client"}`,
+      description: buildSipTaskDescription(event),
+      category: "Follow-up",
+      priority: event.event_type === "terminated" || event.event_type === "rejected" ? "High" : "Medium",
+      status: "Pending",
+      due_date: new Date().toISOString().slice(0, 10),
+      tags: ["SIP", event.event_type].filter(Boolean).join(", "),
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) setError(data.error || "Failed to create SIP follow-up task");
-    else await loadEvents();
-    setRowBusy(null);
+
+    if (event.client_id) params.set("client_id", event.client_id);
+    router.push(`/dashboard/tasks/create?${params.toString()}`);
   }
 
   async function saveRemark(eventId) {
@@ -672,8 +697,7 @@ export default function SipTrackerPage() {
                       ) : isAdmin ? (
                           <button
                             type="button"
-                            disabled={rowBusy === event.id}
-                            onClick={() => createTask(event.id)}
+                            onClick={() => openCreateTask(event)}
                             className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <PlusCircle size={14} />

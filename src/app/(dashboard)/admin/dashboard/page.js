@@ -7,6 +7,7 @@ import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 
 function birthdayHref(birthday) {
   return birthday.client_id ? `/admin/clients/${birthday.client_id}/client-details` : "/admin/birthdays";
@@ -141,7 +142,7 @@ export default function AdminDashboard() {
     };
   }, [loadDashboard]);
 
-  if (loading) return <div className="p-2 text-gray-500 sm:p-6">Loading dashboard...</div>;
+  if (loading) return <BrandLoader label="Loading dashboard" />;
 
   const metrics = data?.metrics || {};
 

@@ -32,6 +32,7 @@ import { Bar, Doughnut, Line } from "react-chartjs-2";
 import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 import FormSelect from "../clients/components/FormSelect";
 import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 
@@ -389,7 +390,7 @@ export default function TeamPerformancePage() {
     ["assigned_by", "Assigned By", options(data?.options?.assigners)],
   ], [data]);
 
-  if (loading && !data) return <div className="p-6 text-slate-500">Loading team performance...</div>;
+  if (loading && !data) return <BrandLoader label="Loading team performance" />;
 
   return (
     <div className="space-y-6 p-4 sm:p-6">

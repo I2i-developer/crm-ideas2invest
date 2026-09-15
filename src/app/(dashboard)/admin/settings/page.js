@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import PageHeader from "@/components/PageHeader";
 import WebPushToggle from "@/components/WebPushToggle";
+import BrandLoader from "@/components/BrandLoader";
 import { supabase } from "@/lib/supabaseClient";
 import FormInput from "../clients/components/FormInput";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
@@ -286,9 +287,7 @@ export default function SettingsPage() {
     toast.success("Settings updated");
   };
 
-  if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Loading settings...</div>;
-  }
+  if (loading) return <BrandLoader label="Loading settings" />;
 
   return (
     <div className="space-y-6">

@@ -143,11 +143,32 @@ export async function POST(request) {
     due_date,
     client_id,
     tags,
-    assigned_to
+    assigned_to,
+    source_sip_event_id
   } = body;
 
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
+  }
+
+  let sourceSipEvent = null;
+  if (source_sip_event_id) {
+    const { data: sipEvent, error: sipEventError } = await taskDb
+      .from("sip_events")
+      .select("id, task_id, client_id")
+      .eq("id", source_sip_event_id)
+      .maybeSingle();
+
+    if (sipEventError) {
+      return NextResponse.json({ error: sipEventError.message }, { status: 500 });
+    }
+    if (!sipEvent) {
+      return NextResponse.json({ error: "Linked SIP event was not found" }, { status: 404 });
+    }
+    if (sipEvent.task_id) {
+      return NextResponse.json({ error: "This SIP event already has a linked task" }, { status: 409 });
+    }
+    sourceSipEvent = sipEvent;
   }
 
   let validAssigneeIds = [];
@@ -170,7 +191,7 @@ export async function POST(request) {
       priority: priority || "Medium",
       status: "Pending",
       due_date,
-      client_id,
+      client_id: client_id || sourceSipEvent?.client_id || null,
       tags,
       created_by: user.id
     })
@@ -205,11 +226,27 @@ export async function POST(request) {
     });
   }
 
+  if (sourceSipEvent) {
+    const { error: sipLinkError } = await taskDb
+      .from("sip_events")
+      .update({ task_id: task.id })
+      .eq("id", sourceSipEvent.id);
+
+    if (sipLinkError) {
+      return NextResponse.json({ error: `Task created, but SIP event link failed: ${sipLinkError.message}` }, { status: 500 });
+    }
+  }
+
   await taskDb.from("task_activity_logs").insert({
     task_id: task.id,
     action_type: "created",
     performed_by: user.id,
-    metadata: { title, priority, category }
+    metadata: {
+      title,
+      priority,
+      category,
+      ...(sourceSipEvent ? { source: "sip_tracker", sip_event_id: sourceSipEvent.id } : {}),
+    }
   });
 
   await writeAuditLog(supabase, {
@@ -219,7 +256,10 @@ export async function POST(request) {
     entityType: "task",
     entityId: task.id,
     newValue: task,
-    metadata: { assigned_to: validAssigneeIds },
+    metadata: {
+      assigned_to: validAssigneeIds,
+      ...(sourceSipEvent ? { source: "sip_tracker", sip_event_id: sourceSipEvent.id } : {}),
+    },
     request,
   });
 

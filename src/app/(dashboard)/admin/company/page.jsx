@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import FormInput from "../clients/components/FormInput";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
+import BrandLoader from "@/components/BrandLoader";
 
 const emptyCompany = {
   company_name: "",
@@ -191,7 +192,7 @@ export default function CompanyPage() {
     loadData();
   }
 
-  if (loading) return <div className="p-6 text-gray-500">Loading company settings...</div>;
+  if (loading) return <BrandLoader label="Loading company settings" />;
 
   return (
     <div className="p-6 space-y-6">

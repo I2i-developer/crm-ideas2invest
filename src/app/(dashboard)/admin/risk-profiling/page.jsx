@@ -9,6 +9,7 @@ import FormInput from "../clients/components/FormInput";
 import FormSelect from "../clients/components/FormSelect";
 import PageHeader from "@/components/PageHeader";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
+import BrandLoader from "@/components/BrandLoader";
 
 export default function RiskProfilingPage() {
   const [role, setRole] = useState(null);
@@ -125,7 +126,7 @@ export default function RiskProfilingPage() {
     loadData(selectedClient);
   }
 
-  if (loading) return <div className="p-6 text-gray-500">Loading risk profiling...</div>;
+  if (loading) return <BrandLoader label="Loading risk profiling" />;
 
   return (
     <div className="p-6 space-y-6">

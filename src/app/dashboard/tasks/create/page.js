@@ -13,6 +13,31 @@ export default function CreateTaskPage() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
+  const [prefillData, setPrefillData] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.size) return;
+
+    const source = params.get("source");
+    const sourceSipEventId = params.get("source_sip_event_id");
+    const isSipPrefill = source === "sip_tracker" || Boolean(sourceSipEventId);
+    if (!isSipPrefill) return;
+
+    setPrefillData({
+      prefill_key: `sip-${sourceSipEventId || Date.now()}`,
+      title: params.get("title") || "",
+      description: params.get("description") || "",
+      category: params.get("category") || "Follow-up",
+      priority: params.get("priority") || "Medium",
+      status: params.get("status") || "Pending",
+      due_date: params.get("due_date") || new Date().toISOString().slice(0, 10),
+      client_id: params.get("client_id") || "",
+      tags: params.get("tags") || "SIP",
+      source_sip_event_id: sourceSipEventId || "",
+      task_assignments: [],
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -66,6 +91,8 @@ export default function CreateTaskPage() {
       </div>
 
       <TaskForm
+        key={prefillData?.prefill_key || "blank-task"}
+        initialData={prefillData}
         users={users}
         clients={clients}
         onSubmit={handleSubmit}
