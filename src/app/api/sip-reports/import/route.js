@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { importSipReport } from "@/lib/crm/sipReports";
 import { writeAuditLog } from "@/lib/audit/logger";
 
@@ -21,7 +21,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isAdmin(role)) {
+  if (!isAdmin(role) && !isOperations(role)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,
@@ -29,7 +29,7 @@ export async function POST(request) {
       entityType: "sip_import",
       request,
     });
-    return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden: Admin or operations access required" }, { status: 403 });
   }
 
   try {

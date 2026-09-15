@@ -67,6 +67,8 @@ export async function middleware(request) {
       pathname.startsWith('/admin/kyc-status') ||
       pathname.startsWith('/admin/risk-profiling') ||
       pathname.startsWith('/admin/tasks') ||
+      pathname.startsWith('/admin/meeting-notes') ||
+      pathname.startsWith('/admin/reminders') ||
       pathname.startsWith('/admin/sip-tracker') ||
       pathname.startsWith('/admin/forms-center') ||
       pathname.startsWith('/admin/company') ||

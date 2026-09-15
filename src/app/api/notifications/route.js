@@ -4,6 +4,7 @@ import { getAuthContext } from "@/lib/auth/permissions";
 import { createNotification } from "@/lib/notifications/service";
 import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
+import { generateDueSelfReminderNotifications } from "@/lib/reminders/selfReminders";
 
 async function generateBirthdayNotifications(request, supabase, userId) {
   const response = await fetch(new URL("/api/birthdays?days=1", request.url), {
@@ -78,6 +79,7 @@ export async function GET(request) {
   await generateTaskDateNotifications(supabase, user.id);
   await generateBirthdayNotifications(request, supabase, user.id);
   await generateKycStatusReminder(supabase, user.id);
+  await generateDueSelfReminderNotifications(supabase, user.id);
 
   let notificationsQuery = notificationDb
     .from("task_notifications")

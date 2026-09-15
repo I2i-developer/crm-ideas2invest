@@ -11,6 +11,9 @@ export const KYC_STATUSES = [
 
 export const KYC_STATUS_OPTIONS = KYC_STATUSES.map((status) => ({ value: status, label: status }));
 
+export const LEGAL_ENTITY_TYPES = ["Individual", "NRI", "Minor", "HUF", "Company", "Trust"];
+export const LEGAL_ENTITY_OPTIONS = LEGAL_ENTITY_TYPES.map((type) => ({ value: type, label: type }));
+
 const HEADER_ALIASES = {
   client_name: [
     "client name",
@@ -31,6 +34,14 @@ const HEADER_ALIASES = {
     "pancard number",
   ],
   kyc_status: ["kyc status", "status", "kyc", "current status"],
+  legal_entity_type: [
+    "legal entity",
+    "legal entity type",
+    "entity type",
+    "client type",
+    "tax status",
+    "category",
+  ],
   remarks: ["remarks", "remark", "notes", "note", "comment", "comments"],
   kra_agency: ["kra", "kra agency", "kyc agency"],
 };
@@ -55,6 +66,21 @@ const STATUS_ALIASES = new Map([
   ["", "Not Checked"],
 ]);
 
+const LEGAL_ENTITY_ALIASES = new Map([
+  ["individual", "Individual"],
+  ["resident individual", "Individual"],
+  ["nri", "NRI"],
+  ["non resident indian", "NRI"],
+  ["non-resident indian", "NRI"],
+  ["minor", "Minor"],
+  ["huf", "HUF"],
+  ["hindu undivided family", "HUF"],
+  ["company", "Company"],
+  ["corporate", "Company"],
+  ["trust", "Trust"],
+  ["", "Individual"],
+]);
+
 export function normalizePan(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
 }
@@ -67,6 +93,12 @@ export function normalizeKycStatus(value) {
   const raw = String(value || "").trim();
   if (KYC_STATUSES.includes(raw)) return raw;
   return STATUS_ALIASES.get(raw.toLowerCase()) || "Not Checked";
+}
+
+export function normalizeLegalEntityType(value) {
+  const raw = String(value || "").trim();
+  if (LEGAL_ENTITY_TYPES.includes(raw)) return raw;
+  return LEGAL_ENTITY_ALIASES.get(raw.toLowerCase()) || "Individual";
 }
 
 export function buildKycSummary(rows = []) {
@@ -154,6 +186,7 @@ export async function parseKycImport(file) {
       pan_number: panNumber || null,
       normalized_pan: panNumber || null,
       kyc_status: normalizeKycStatus(mapped.kyc_status),
+      legal_entity_type: mapped.legal_entity_type ? normalizeLegalEntityType(mapped.legal_entity_type) : null,
       remarks: String(mapped.remarks || "").trim() || null,
       kra_agency: String(mapped.kra_agency || "").trim() || null,
       raw_import_row: raw,
@@ -171,6 +204,7 @@ export function normalizeKycPayload(body = {}, userId = null) {
     pan_number: normalizedPan || null,
     normalized_pan: normalizedPan || null,
     kyc_status: normalizeKycStatus(body.kyc_status),
+    legal_entity_type: normalizeLegalEntityType(body.legal_entity_type),
     status_source: body.status_source || "Manual",
     kra_agency: body.kra_agency || null,
     last_checked_at: body.last_checked_at || null,

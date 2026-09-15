@@ -7,6 +7,15 @@ import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { getTaskLifecycle, summarizeTasks } from "@/lib/tasks/performance";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function dashboardJson(payload, init = {}) {
+  const headers = new Headers(init.headers || {});
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+  return NextResponse.json(payload, { ...init, headers });
+}
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -62,7 +71,7 @@ export async function GET(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return dashboardJson({ error: "Unauthorized" }, { status: 401 });
   }
 
   await generateTaskDateNotifications(supabase, user.id);
@@ -71,7 +80,7 @@ export async function GET(request) {
   const today = dateKey();
   const monthStart = monthStartKey();
 
-  const [clientsRes, documentsRes, tasksRes, taskActivityRes, profilesRes, notificationsRes, riskRes, sipRes, selfTasksRes, kycStatusesRes] = await Promise.all([
+  const [clientsRes, legacyDocumentsRes, clientDocumentsRes, tasksRes, taskActivityRes, profilesRes, notificationsRes, riskRes, sipRes, selfTasksRes, kycStatusesRes] = await Promise.all([
     supabase
       .from("clients")
       .select("id, full_name, created_at, updated_at, operations_owner, relationship_manager, tax_status, holding_pattern")
@@ -79,6 +88,10 @@ export async function GET(request) {
     supabase
       .from("documents")
       .select("id, client_id, status, document_type, updated_at")
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("client_documents")
+      .select("id, client_id, status, document_type, requirement_key, label, updated_at")
       .order("updated_at", { ascending: false }),
     taskDb
       .from("tasks")
@@ -122,7 +135,7 @@ export async function GET(request) {
     : { data: [], error: null };
 
   if (taskAssignmentsError) {
-    return NextResponse.json({ error: taskAssignmentsError.message }, { status: 500 });
+    return dashboardJson({ error: taskAssignmentsError.message }, { status: 500 });
   }
 
   const assignmentsByTask = new Map();
@@ -143,7 +156,14 @@ export async function GET(request) {
       );
 
   const visibleClientIds = new Set((clientsRes.data || []).map((client) => client.id));
-  const visibleDocuments = (documentsRes.data || []).filter((document) => visibleClientIds.has(document.client_id));
+  const allDocuments = [
+    ...(legacyDocumentsRes.data || []),
+    ...(clientDocumentsRes.data || []).map((document) => ({
+      ...document,
+      document_type: document.document_type || document.label || document.requirement_key || "Document",
+    })),
+  ];
+  const visibleDocuments = allDocuments.filter((document) => visibleClientIds.has(document.client_id));
   const documentsRequiringAction = visibleDocuments.filter((document) =>
     ["Uploaded", "Parsed", "Under review", "Rejected"].includes(document.status)
   );
@@ -171,9 +191,10 @@ export async function GET(request) {
   );
   const sipPendingFollowUps = visibleSipEvents.filter((event) => event.follow_up_status === "pending");
   const sipUnmatchedRecords = allSipEvents.filter((event) => event.matched_status === "unmatched");
-  const sipTerminatedTotal = allSipEvents.filter((event) => event.event_type === "terminated");
-  const sipRejectedTotal = allSipEvents.filter((event) => event.event_type === "rejected");
-  const sipPausedTotal = allSipEvents.filter((event) => event.event_type === "paused");
+  const unresolvedSipEvents = allSipEvents.filter((event) => event.follow_up_status !== "resolved");
+  const sipTerminatedTotal = unresolvedSipEvents.filter((event) => event.event_type === "terminated");
+  const sipRejectedTotal = unresolvedSipEvents.filter((event) => event.event_type === "rejected");
+  const sipPausedTotal = unresolvedSipEvents.filter((event) => event.event_type === "paused");
 
   const pendingTasks = visibleTasks.filter((task) => !task.completed && !task.cancelled);
   const overdueTasks = pendingTasks.filter((task) => task.due_date && task.due_date < today);
@@ -224,7 +245,7 @@ export async function GET(request) {
 
   const adminIds = admin ? await getAdminUserIds(supabase) : [];
 
-  return NextResponse.json({
+  return dashboardJson({
     role,
     current_user: {
       id: user.id,

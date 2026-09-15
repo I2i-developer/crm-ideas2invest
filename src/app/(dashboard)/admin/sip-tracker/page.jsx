@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   CheckSquare,
   FileSpreadsheet,
-  PauseCircle,
   PlusCircle,
   RefreshCw,
   Search,
@@ -177,11 +176,14 @@ export default function SipTrackerPage() {
     event_type: "all",
     follow_up_status: "all",
     search: "",
+    date_from: "",
+    date_to: "",
   });
   const importAbortRef = useRef(null);
   const importProgressTimerRef = useRef(null);
 
   const isAdmin = role === "admin";
+  const canImportSipReports = role === "admin" || role === "operations";
 
   const loadProfile = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -224,6 +226,8 @@ export default function SipTrackerPage() {
       event_type: params.get("event_type") || current.event_type,
       follow_up_status: params.get("follow_up_status") || current.follow_up_status,
       search: params.get("search") || current.search,
+      date_from: params.get("date_from") || current.date_from,
+      date_to: params.get("date_to") || current.date_to,
     }));
   }, []);
 
@@ -233,7 +237,7 @@ export default function SipTrackerPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters.event_type, filters.follow_up_status, filters.search]);
+  }, [filters.event_type, filters.follow_up_status, filters.search, filters.date_from, filters.date_to]);
 
   useEffect(() => {
     const eventIds = new Set(events.map((event) => event.id));
@@ -412,7 +416,7 @@ export default function SipTrackerPage() {
         icon={FileSpreadsheet}
       />
 
-      {isAdmin && (
+      {canImportSipReports && (
         <form onSubmit={handleImport} className="glass-card p-5 space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -482,9 +486,6 @@ export default function SipTrackerPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard title="Terminated This Week" value={summary.terminated_this_week} icon={XCircle} tone="red" />
-        <SummaryCard title="Paused This Week" value={summary.paused_this_week} icon={PauseCircle} tone="amber" />
-        <SummaryCard title="Rejected This Week" value={summary.rejected_this_week} icon={AlertTriangle} tone="violet" />
         <SummaryCard title="Pending Follow-ups" value={summary.pending_followups} icon={RefreshCw} tone="blue" />
         <SummaryCard title="Total Terminated" value={summary.total_terminated} icon={XCircle} tone="red" />
         <SummaryCard title="Total Rejected" value={summary.total_rejected} icon={AlertTriangle} tone="violet" />
@@ -519,8 +520,9 @@ export default function SipTrackerPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(150px,1fr)_minmax(190px,1fr)_140px_140px_minmax(320px,1.7fr)]">
           <FormSelect
+            label="Event type"
             name="event_type"
             value={filters.event_type}
             onValueChange={(value) => setFilters((current) => ({ ...current, event_type: value }))}
@@ -528,21 +530,43 @@ export default function SipTrackerPage() {
             placeholder="Event type"
           />
           <FormSelect
+            label="Follow-up status"
             name="follow_up_status"
             value={filters.follow_up_status}
             onValueChange={(value) => setFilters((current) => ({ ...current, follow_up_status: value }))}
             options={[{ value: "all", label: "All follow-up statuses" }, ...FOLLOW_UP_STATUSES.map(([value, label]) => ({ value, label }))]}
             placeholder="Follow-up status"
           />
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200">From date</span>
             <input
-              value={filters.search}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Search name, mobile, email, folio"
-              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm"
+              type="date"
+              value={filters.date_from}
+              onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value }))}
+              className="h-[42px] w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
-          </div>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200">To date</span>
+            <input
+              type="date"
+              value={filters.date_to}
+              onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value }))}
+              className="h-[42px] w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+          <label className="block md:col-span-2 xl:col-span-1">
+            <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200">Search</span>
+            <span className="relative block">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                placeholder="Name, mobile, email, folio"
+                className="h-[42px] w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </span>
+          </label>
         </div>
 
         <div className="overflow-x-auto">

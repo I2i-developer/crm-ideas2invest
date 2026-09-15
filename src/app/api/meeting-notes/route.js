@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext, isAdmin, isOperations, canAccessClient } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { createNotification } from "@/lib/notifications/service";
+import { generateDueSelfReminderNotifications } from "@/lib/reminders/selfReminders";
 
 export const dynamic = "force-dynamic";
 
@@ -37,45 +37,13 @@ async function canManageMeetingClient(supabase, user, role, clientId) {
   return canAccessClient(supabase, user.id, role, clientId);
 }
 
-async function generateDueReminderNotifications(supabase, userId) {
-  const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-
-  const { data: reminders } = await supabase
-    .from("client_meeting_reminders")
-    .select("id, title, reminder_at, priority, client_id, meeting_id, last_notification_at")
-    .eq("user_id", userId)
-    .in("status", ["Pending", "Snoozed"])
-    .lte("reminder_at", now.toISOString())
-    .or(`last_notification_at.is.null,last_notification_at.lt.${oneHourAgo}`);
-
-  for (const reminder of reminders || []) {
-    await createNotification(supabase, {
-      userId,
-      title: "Meeting reminder due",
-      message: reminder.title,
-      type: "meeting_reminder_due",
-      entityType: "client_meeting_reminder",
-      entityId: reminder.id,
-      linkUrl: reminder.meeting_id ? `/admin/meeting-notes?meeting_id=${reminder.meeting_id}` : "/admin/meeting-notes",
-      metadata: reminder,
-      dedupeKey: `meeting_reminder_due:${reminder.id}:${now.toISOString().slice(0, 13)}`,
-    });
-
-    await supabase
-      .from("client_meeting_reminders")
-      .update({ last_notification_at: now.toISOString() })
-      .eq("id", reminder.id);
-  }
-}
-
 export async function GET(request) {
   const supabase = await createClient(request);
   const { user, role } = await getAuthContext(supabase);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await generateDueReminderNotifications(supabase, user.id);
+  await generateDueSelfReminderNotifications(supabase, user.id);
 
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("client_id");

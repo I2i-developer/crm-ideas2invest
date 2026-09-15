@@ -28,10 +28,13 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 const KYC_STATUSES = ["Not Checked", "KYC Validated", "KYC Registered", "KYC On-Hold", "KYC Rejected"];
 const STATUS_OPTIONS = KYC_STATUSES.map((status) => ({ value: status, label: status }));
+const LEGAL_ENTITY_TYPES = ["Individual", "NRI", "Minor", "HUF", "Company", "Trust"];
+const LEGAL_ENTITY_OPTIONS = LEGAL_ENTITY_TYPES.map((type) => ({ value: type, label: type }));
 
 const emptyForm = {
   client_name: "",
   pan_number: "",
+  legal_entity_type: "Individual",
   kyc_status: "Not Checked",
   status_source: "Manual",
   kra_agency: "",
@@ -53,6 +56,18 @@ function statusStyle(status) {
     "Not Checked": "border-slate-200 bg-slate-50 text-slate-600",
   };
   return styles[status] || styles["Not Checked"];
+}
+
+function entityStyle(type) {
+  const styles = {
+    Individual: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-300/40 dark:bg-blue-500/20 dark:text-blue-100",
+    NRI: "border-lime-200 bg-lime-50 text-lime-700 dark:border-lime-300/40 dark:bg-lime-500/20 dark:text-lime-100",
+    Minor: "border-pink-200 bg-pink-50 text-pink-700 dark:border-pink-300/40 dark:bg-pink-500/20 dark:text-pink-100",
+    HUF: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-300/40 dark:bg-amber-400/20 dark:text-amber-100",
+    Company: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-300/40 dark:bg-emerald-500/20 dark:text-emerald-100",
+    Trust: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-300/40 dark:bg-cyan-500/20 dark:text-cyan-100",
+  };
+  return styles[type] || styles.Individual;
 }
 
 function todayIsoDateTime() {
@@ -82,7 +97,7 @@ export default function KycStatusPage() {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
-  const [filters, setFilters] = useState({ search: "", status: "" });
+  const [filters, setFilters] = useState({ search: "", status: "", legal_entity_type: "" });
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [recordToDelete, setRecordToDelete] = useState(null);
@@ -102,10 +117,11 @@ export default function KycStatusPage() {
 
   const loadRecords = useCallback(async (nextFilters) => {
     setLoading(true);
-    const activeFilters = nextFilters || { search: "", status: "" };
+    const activeFilters = nextFilters || { search: "", status: "", legal_entity_type: "" };
     const params = new URLSearchParams();
     if (activeFilters.search) params.set("search", activeFilters.search);
     if (activeFilters.status) params.set("status", activeFilters.status);
+    if (activeFilters.legal_entity_type) params.set("legal_entity_type", activeFilters.legal_entity_type);
     const response = await authFetch(`/api/kyc-statuses?${params.toString()}`);
     const data = await response.json();
     if (!response.ok) {
@@ -122,7 +138,11 @@ export default function KycStatusPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const nextFilters = { search: params.get("search") || "", status: params.get("status") || "" };
+    const nextFilters = {
+      search: params.get("search") || "",
+      status: params.get("status") || "",
+      legal_entity_type: params.get("legal_entity_type") || "",
+    };
     setFilters(nextFilters);
   }, []);
 
@@ -140,11 +160,18 @@ export default function KycStatusPage() {
     setShowForm(false);
   }
 
+  function startAdd() {
+    setForm(emptyForm);
+    setEditingId(null);
+    setShowForm(true);
+  }
+
   function startEdit(record) {
     setEditingId(record.id);
     setForm({
       client_name: record.client_name || "",
       pan_number: record.pan_number || record.normalized_pan || "",
+      legal_entity_type: record.legal_entity_type || record.client?.tax_status || "Individual",
       kyc_status: record.kyc_status || "Not Checked",
       status_source: record.status_source || "Manual",
       kra_agency: record.kra_agency || "",
@@ -153,7 +180,6 @@ export default function KycStatusPage() {
       remarks: record.remarks || "",
     });
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function saveRecord(event) {
@@ -245,6 +271,7 @@ export default function KycStatusPage() {
   function exportRecords() {
     const rows = records.map((record) => ({
       "Client Name": record.client_name,
+      "Legal Entity Type": record.legal_entity_type || record.client?.tax_status || "Individual",
       "PAN Number": record.normalized_pan,
       "KYC Status": record.kyc_status,
       "KRA Agency": record.kra_agency || "",
@@ -286,7 +313,7 @@ export default function KycStatusPage() {
             </button>
             <button
               type="button"
-              onClick={() => setShowForm((current) => !current)}
+              onClick={startAdd}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
               <Plus size={17} /> Add Client
@@ -315,7 +342,7 @@ export default function KycStatusPage() {
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.35fr)]">
+          <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.35fr)_minmax(180px,0.35fr)]">
             <label className="block">
               <span className="mb-1 block text-sm text-slate-800 dark:text-white">Search name / PAN / remarks</span>
               <span className="relative block">
@@ -333,6 +360,12 @@ export default function KycStatusPage() {
               value={filters.status}
               onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
               options={[{ value: "", label: "All Statuses" }, ...STATUS_OPTIONS]}
+            />
+            <FormSelect
+              label="Legal Entity"
+              value={filters.legal_entity_type}
+              onValueChange={(value) => setFilters((current) => ({ ...current, legal_entity_type: value }))}
+              options={[{ value: "", label: "All Entities" }, ...LEGAL_ENTITY_OPTIONS]}
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -352,7 +385,7 @@ export default function KycStatusPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold">Import summary</p>
-              <p className="mt-1 text-xs text-blue-800">Accepted headers: Client Name, PAN Number, KYC Status, Remarks, KRA Agency. PAN can be blank.</p>
+              <p className="mt-1 text-xs text-blue-800">Accepted headers: Client Name, PAN Number, Legal Entity Type, KYC Status, Remarks, KRA Agency. PAN can be blank.</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <span>Total: {importSummary.total_rows}</span>
@@ -370,35 +403,6 @@ export default function KycStatusPage() {
               ))}
             </div>
           )}
-        </section>
-      )}
-
-      {canManageKycRecords && showForm && (
-        <section className="mt-4">
-            <form onSubmit={saveRecord} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-bold text-slate-950 dark:text-slate-50">{editingId ? "Edit KYC Record" : "Add KYC Record"}</h2>
-                <button type="button" onClick={resetForm} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <FormInput label="Client Name" value={form.client_name} onValueChange={(value) => setForm((current) => ({ ...current, client_name: value }))} required />
-                <FormInput label="PAN Number" value={form.pan_number} onValueChange={(value) => setForm((current) => ({ ...current, pan_number: normalizePan(value) }))} />
-                <FormSelect label="KYC Status" value={form.kyc_status} onValueChange={(value) => setForm((current) => ({ ...current, kyc_status: value }))} options={STATUS_OPTIONS} />
-                <FormInput label="KRA Agency" value={form.kra_agency} onValueChange={(value) => setForm((current) => ({ ...current, kra_agency: value }))} />
-                <FormInput label="Last Checked At" type="datetime-local" value={form.last_checked_at} onValueChange={(value) => setForm((current) => ({ ...current, last_checked_at: value }))} />
-                <FormInput label="Remarks" value={form.remarks} onValueChange={(value) => setForm((current) => ({ ...current, remarks: value }))} />
-              </div>
-              <button
-                type="submit"
-                disabled={saving}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-70"
-              >
-                {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                {saving ? "Saving..." : "Save KYC Record"}
-              </button>
-            </form>
         </section>
       )}
 
@@ -438,7 +442,12 @@ export default function KycStatusPage() {
                   {paginatedRecords.map((record) => (
                     <tr key={record.id} className="hover:bg-slate-50/70 dark:bg-slate-900 dark:hover:bg-slate-800">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900 dark:text-slate-50">{record.client_name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-900 dark:text-slate-50">{record.client_name}</span>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${entityStyle(record.legal_entity_type || record.client?.tax_status || "Individual")}`}>
+                            {record.legal_entity_type || record.client?.tax_status || "Individual"}
+                          </span>
+                        </div>
                         {record.client?.full_name && (
                           <div className="text-xs text-emerald-700 dark:text-emerald-300">Linked: {record.client.full_name}</div>
                         )}
@@ -533,6 +542,107 @@ export default function KycStatusPage() {
           </>
         )}
       </section>
+
+      {canManageKycRecords && showForm && (
+        <>
+          <button
+            type="button"
+            aria-label="Close KYC record dialog"
+            className="fixed inset-0 z-40 h-screen bg-slate-950/35 backdrop-blur-sm"
+            onClick={resetForm}
+          />
+          <div className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-emerald-50 px-5 py-4 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50">
+                  {editingId ? "Edit KYC record" : "Add KYC client"}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-300">
+                  Maintain PAN-wise KYC status for tracker follow-up and export.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <form onSubmit={saveRecord} className="p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput
+                  label="Client Name"
+                  value={form.client_name}
+                  onValueChange={(value) => setForm((current) => ({ ...current, client_name: value }))}
+                  required
+                />
+                <FormInput
+                  label="PAN Number"
+                  value={form.pan_number}
+                  onValueChange={(value) => setForm((current) => ({ ...current, pan_number: normalizePan(value) }))}
+                />
+                <FormSelect
+                  label="Legal Entity"
+                  value={form.legal_entity_type}
+                  onValueChange={(value) => setForm((current) => ({ ...current, legal_entity_type: value }))}
+                  options={LEGAL_ENTITY_OPTIONS}
+                />
+                <FormSelect
+                  label="KYC Status"
+                  value={form.kyc_status}
+                  onValueChange={(value) => setForm((current) => ({ ...current, kyc_status: value }))}
+                  options={STATUS_OPTIONS}
+                />
+                <FormInput
+                  label="KRA Agency"
+                  value={form.kra_agency}
+                  onValueChange={(value) => setForm((current) => ({ ...current, kra_agency: value }))}
+                />
+                <FormInput
+                  label="Last Checked At"
+                  type="datetime-local"
+                  value={form.last_checked_at}
+                  onValueChange={(value) => setForm((current) => ({ ...current, last_checked_at: value }))}
+                />
+                <FormInput
+                  label="Next Review Date"
+                  type="date"
+                  value={form.next_review_date}
+                  onValueChange={(value) => setForm((current) => ({ ...current, next_review_date: value }))}
+                />
+                <FormInput
+                  label="Remarks"
+                  value={form.remarks}
+                  onValueChange={(value) => setForm((current) => ({ ...current, remarks: value }))}
+                  multiline
+                  rows={3}
+                  className="md:col-span-2"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                  {saving ? "Saving..." : editingId ? "Update KYC Record" : "Add KYC Record"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
 
       <ConfirmDialog
         open={Boolean(recordToDelete)}

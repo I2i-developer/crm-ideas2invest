@@ -228,6 +228,7 @@ import {
   ListChecks,
   ChartNoAxesCombined,
   Sparkles,
+  CalendarClock,
 } from "lucide-react";
 
 function isActiveRoute(currentPath, itemPath, matchType = "section") {
@@ -285,12 +286,13 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     // { name: "Clients", path: "/admin/clients", icon: Users },
     { name: "Birthdays", path: "/admin/birthdays", icon: Cake },
     { name: "Tasks", path: "/dashboard/tasks", icon: ListTodo },
-    { name: "Team Performance", path: "/admin/team-performance", icon: ChartNoAxesCombined, adminOnly: true },
-    { name: "Meeting Notes", path: "/admin/meeting-notes", icon: ClipboardList },
-    { name: "My Work Tracker", path: "/operations/my-work-tracker", icon: ListChecks, operationsOnly: true },
     { name: "SIP Tracker", path: "/admin/sip-tracker", icon: ChartCandlestick },
-    { name: "Forms Center", path: "/admin/forms-center", icon: LibraryBig },
     { name: "KYC Status", path: "/admin/kyc-status", icon: IdCard },
+    { name: "My Work Tracker", path: "/operations/my-work-tracker", icon: ListChecks, operationsOnly: true },
+    { name: "Team Performance", path: "/admin/team-performance", icon: ChartNoAxesCombined, adminOnly: true },
+    { name: "Self Reminders", path: "/admin/reminders", icon: CalendarClock },
+    { name: "Meeting Notes", path: "/admin/meeting-notes", icon: ClipboardList },
+    { name: "Forms Center", path: "/admin/forms-center", icon: LibraryBig },
     { name: "Calculators", path: "/admin/calculators", icon: Calculator },
     // { name: "Risk Profiling", path: "/admin/risk-profiling", icon: ShieldQuestion },
     { name: "Required Docs", path: "/admin/document-requirements", icon: FileCheck2 },

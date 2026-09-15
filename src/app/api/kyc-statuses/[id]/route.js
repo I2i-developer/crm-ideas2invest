@@ -44,7 +44,7 @@ export async function PATCH(request, { params }) {
     .from("client_kyc_statuses")
     .update(payload)
     .eq("id", id)
-    .select("*, client:clients(id, full_name, email, mobile)")
+    .select("*, client:clients(id, full_name, email, mobile, tax_status)")
     .single();
 
   if (error) {

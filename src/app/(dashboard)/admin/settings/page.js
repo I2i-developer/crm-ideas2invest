@@ -23,6 +23,7 @@ const DEFAULT_NOTIFICATIONS = {
   document_review: true,
   birthday_reminders: true,
   sip_followups: true,
+  self_reminders: true,
   real_time_toasts: true,
 };
 
@@ -413,6 +414,12 @@ export default function SettingsPage() {
             description="Notify me about SIP pause, termination, rejection, and pending follow-up rows."
             checked={notifications.sip_followups}
             onChange={() => toggleNotification("sip_followups")}
+          />
+          <ToggleRow
+            label="Self reminders"
+            description="Notify me when my personal CRM reminders become due."
+            checked={notifications.self_reminders}
+            onChange={() => toggleNotification("self_reminders")}
           />
           <ToggleRow
             label="Realtime toast alerts"

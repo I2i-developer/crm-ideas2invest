@@ -10,7 +10,10 @@ function normalizeClientMatchRows(rows = []) {
   const matches = new Map();
   for (const row of rows || []) {
     if (!row.pan || !row.client_id) continue;
-    matches.set(String(row.pan).toUpperCase(), row.client_id);
+    matches.set(String(row.pan).toUpperCase(), {
+      client_id: row.client_id,
+      legal_entity_type: row.client?.tax_status || null,
+    });
   }
   return matches;
 }
@@ -77,7 +80,7 @@ export async function POST(request) {
     const { data: holderMatches, error: holderError } = acceptedPans.length
       ? await supabase
           .from("client_holders")
-          .select("pan, client_id")
+          .select("pan, client_id, client:clients(id, tax_status)")
           .in("pan", acceptedPans)
       : { data: [], error: null };
 
@@ -104,11 +107,12 @@ export async function POST(request) {
     if (importError) throw new Error(importError.message);
 
     const payload = acceptedRows.map((row) => ({
-      client_id: clientByPan.get(row.normalized_pan) || null,
+      client_id: clientByPan.get(row.normalized_pan)?.client_id || null,
       client_name: row.client_name,
       pan_number: row.pan_number,
       normalized_pan: row.normalized_pan,
       kyc_status: row.kyc_status,
+      legal_entity_type: row.legal_entity_type || clientByPan.get(row.normalized_pan)?.legal_entity_type || "Individual",
       status_source: "Bulk Upload",
       kra_agency: row.kra_agency,
       remarks: row.remarks,

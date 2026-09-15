@@ -65,6 +65,22 @@ function GreetingTitle({ data }) {
   );
 }
 
+const DASHBOARD_REFRESH_TABLES = [
+  "clients",
+  "client_holders",
+  "documents",
+  "client_documents",
+  "tasks",
+  "task_assignments",
+  "task_activity_logs",
+  "task_notifications",
+  "risk_profile_assessments",
+  "sip_events",
+  "operation_self_tasks",
+  "client_kyc_statuses",
+  "manual_client_birthdays",
+];
+
 export default function OperationsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,20 +99,37 @@ export default function OperationsDashboard() {
 
   useEffect(() => {
     const refreshDashboard = () => loadDashboard({ silent: true });
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(refreshDashboard, 250);
+    };
+    const refreshIfVisible = () => {
+      if (!document.hidden) refreshDashboard();
+    };
+
     window.addEventListener("focus", refreshDashboard);
     window.addEventListener("pageshow", refreshDashboard);
+    document.addEventListener("visibilitychange", refreshIfVisible);
 
-    const dashboardChannel = supabase
-      .channel("operations-dashboard-task-updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, refreshDashboard)
-      .on("postgres_changes", { event: "*", schema: "public", table: "task_assignments" }, refreshDashboard)
-      .on("postgres_changes", { event: "*", schema: "public", table: "sip_events" }, refreshDashboard)
-      .on("postgres_changes", { event: "*", schema: "public", table: "operation_self_tasks" }, refreshDashboard)
-      .subscribe();
+    let dashboardChannel = supabase.channel("operations-dashboard-live-updates");
+    DASHBOARD_REFRESH_TABLES.forEach((table) => {
+      dashboardChannel = dashboardChannel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table },
+        scheduleRefresh
+      );
+    });
+    dashboardChannel.subscribe();
+
+    const refreshInterval = window.setInterval(refreshIfVisible, 15000);
 
     return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearInterval(refreshInterval);
       window.removeEventListener("focus", refreshDashboard);
       window.removeEventListener("pageshow", refreshDashboard);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
       supabase.removeChannel(dashboardChannel);
     };
   }, [loadDashboard]);

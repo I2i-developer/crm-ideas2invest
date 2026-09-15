@@ -64,6 +64,10 @@ function correctedEventDates(event) {
   };
 }
 
+function sipEventDate(event) {
+  return event.termination_date || event.end_date || event.start_date || event.sip_registration_date;
+}
+
 function filterVisibleEvents(events, admin) {
   if (admin) return events;
   return events;
@@ -75,13 +79,14 @@ function buildSummary(events, userId) {
     Boolean(event.termination_date) &&
     event.termination_date >= week.start &&
     event.termination_date <= week.end;
+  const unresolved = (event) => event.follow_up_status !== "resolved";
 
   return {
     terminated_this_week: events.filter((event) => event.event_type === "terminated" && isThisWeek(event)).length,
     paused_this_week: events.filter((event) => event.event_type === "paused" && isThisWeek(event)).length,
     rejected_this_week: events.filter((event) => event.event_type === "rejected" && isThisWeek(event)).length,
-    total_terminated: events.filter((event) => event.event_type === "terminated").length,
-    total_rejected: events.filter((event) => event.event_type === "rejected").length,
+    total_terminated: events.filter((event) => event.event_type === "terminated" && unresolved(event)).length,
+    total_rejected: events.filter((event) => event.event_type === "rejected" && unresolved(event)).length,
     total_resolved: events.filter((event) => event.follow_up_status === "resolved").length,
     pending_followups: events.filter((event) => event.follow_up_status === "pending").length,
     unmatched_records: events.filter((event) => event.matched_status === "unmatched").length,
@@ -139,8 +144,14 @@ export async function GET(request) {
     ...correctedEventDates(event),
   }));
 
-  if (dateFrom) events = events.filter((event) => event.termination_date && event.termination_date >= dateFrom);
-  if (dateTo) events = events.filter((event) => event.termination_date && event.termination_date <= dateTo);
+  if (dateFrom) events = events.filter((event) => {
+    const eventDate = sipEventDate(event);
+    return eventDate && eventDate >= dateFrom;
+  });
+  if (dateTo) events = events.filter((event) => {
+    const eventDate = sipEventDate(event);
+    return eventDate && eventDate <= dateTo;
+  });
   events = events.filter((event) => matchesSearch(event, search));
 
   const assigneeIds = [...new Set(events.map((event) => event.assigned_to).filter(Boolean))];

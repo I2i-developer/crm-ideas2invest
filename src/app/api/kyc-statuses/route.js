@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { buildKycSummary, isValidPan, normalizeKycPayload, normalizePan } from "@/lib/kyc/status";
+import { buildKycSummary, isValidPan, normalizeKycPayload, normalizeLegalEntityType, normalizePan } from "@/lib/kyc/status";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ async function findClientByPan(supabase, pan) {
 
   const { data: holder } = await supabase
     .from("client_holders")
-    .select("client_id, client:clients(id, full_name)")
+    .select("client_id, client:clients(id, full_name, tax_status)")
     .eq("pan", normalized)
     .maybeSingle();
 
@@ -31,17 +31,19 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const status = searchParams.get("status") || "";
+  const legalEntityType = searchParams.get("legal_entity_type") || "";
   const review = searchParams.get("review") || "";
   const limit = Math.min(Number(searchParams.get("limit") || 1000), 5000);
 
   let query = supabase
     .from("client_kyc_statuses")
-    .select("*, client:clients(id, full_name, email, mobile)")
+    .select("*, client:clients(id, full_name, email, mobile, tax_status)")
     .order("client_name", { ascending: true })
     .order("updated_at", { ascending: false })
     .limit(limit);
 
   if (status) query = query.eq("kyc_status", status);
+  if (legalEntityType) query = query.eq("legal_entity_type", normalizeLegalEntityType(legalEntityType));
   if (review === "due") {
     query = query.lte("next_review_date", new Date().toISOString().slice(0, 10));
   }
@@ -83,6 +85,7 @@ export async function POST(request) {
   const insertPayload = {
     ...payload,
     client_id: payload.client_id || linkedClient?.id || null,
+    legal_entity_type: body.legal_entity_type ? payload.legal_entity_type : normalizeLegalEntityType(linkedClient?.tax_status),
     created_by: user.id,
     updated_by: user.id,
   };
@@ -90,7 +93,7 @@ export async function POST(request) {
   const { data, error } = await supabase
     .from("client_kyc_statuses")
     .insert(insertPayload)
-    .select("*, client:clients(id, full_name, email, mobile)")
+    .select("*, client:clients(id, full_name, email, mobile, tax_status)")
     .single();
 
   if (error) {
