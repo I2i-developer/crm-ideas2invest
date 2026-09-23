@@ -7,9 +7,29 @@ function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
-export function useVoiceInput({ language = "en-IN", onResult } = {}) {
+async function requestMicrophoneAccess() {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return true;
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getTracks().forEach((track) => track.stop());
+  return true;
+}
+
+export function useVoiceInput({
+  language = "en-IN",
+  onResult,
+  continuous = false,
+  restartOnSilence = false,
+} = {}) {
   const recognitionRef = useRef(null);
   const onResultRef = useRef(onResult);
+  const finalTranscriptRef = useRef("");
+  const shouldListenRef = useRef(false);
+  const manuallyStoppedRef = useRef(false);
+  const microphoneReadyRef = useRef(false);
+  const restartTimerRef = useRef(null);
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -27,6 +47,7 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.onend = null;
+        window.clearTimeout(restartTimerRef.current);
         try {
           recognitionRef.current.stop();
         } catch {
@@ -38,6 +59,9 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
   }, []);
 
   const stop = useCallback(() => {
+    manuallyStoppedRef.current = true;
+    shouldListenRef.current = false;
+    window.clearTimeout(restartTimerRef.current);
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -48,7 +72,7 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
     setListening(false);
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     const SpeechRecognition = getSpeechRecognition();
 
     if (!SpeechRecognition) {
@@ -57,13 +81,35 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
       return;
     }
 
+    window.clearTimeout(restartTimerRef.current);
+    manuallyStoppedRef.current = false;
+    shouldListenRef.current = true;
+    setError("");
+
+    if (!microphoneReadyRef.current) {
+      try {
+        await requestMicrophoneAccess();
+        microphoneReadyRef.current = true;
+      } catch {
+        shouldListenRef.current = false;
+        setListening(false);
+        setError("Microphone permission was denied. Allow microphone access in browser site settings.");
+        return;
+      }
+    }
+
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      recognitionRef.current.onend = null;
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // Existing recognizer may already be stopped.
+      }
     }
 
     const recognition = new SpeechRecognition();
     recognition.lang = language;
-    recognition.continuous = false;
+    recognition.continuous = continuous;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -81,15 +127,34 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
         }
       }
 
-      const nextTranscript = (finalTranscript || interimTranscript).trim();
+      if (finalTranscript.trim()) {
+        finalTranscriptRef.current = [finalTranscriptRef.current, finalTranscript.trim()]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      const nextTranscript = [finalTranscriptRef.current, interimTranscript.trim()]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
       setTranscript(nextTranscript);
 
-      if (finalTranscript.trim()) {
-        onResultRef.current?.(finalTranscript.trim());
+      if (nextTranscript) {
+        onResultRef.current?.(nextTranscript, {
+          final: Boolean(finalTranscript.trim()),
+          interim: interimTranscript.trim(),
+        });
       }
     };
 
     recognition.onerror = (event) => {
+      if (event.error === "no-speech" && restartOnSilence && shouldListenRef.current) {
+        return;
+      }
+
       const message =
         event.error === "not-allowed" || event.error === "service-not-allowed"
           ? "Microphone permission was denied."
@@ -97,13 +162,27 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
 
       setError(message);
       setListening(false);
+      shouldListenRef.current = false;
     };
 
     recognition.onend = () => {
+      if (restartOnSilence && shouldListenRef.current && !manuallyStoppedRef.current) {
+        restartTimerRef.current = window.setTimeout(() => {
+          try {
+            recognition.start();
+            setListening(true);
+          } catch {
+            setListening(false);
+          }
+        }, 350);
+        return;
+      }
+
       setListening(false);
     };
 
     recognitionRef.current = recognition;
+    finalTranscriptRef.current = "";
     setTranscript("");
     setError("");
     setListening(true);
@@ -111,9 +190,15 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
       recognition.start();
     } catch {
       setListening(false);
+      shouldListenRef.current = false;
       setError("Voice input could not be started.");
     }
-  }, [language]);
+  }, [continuous, language, restartOnSilence]);
+
+  const resetTranscript = useCallback(() => {
+    finalTranscriptRef.current = "";
+    setTranscript("");
+  }, []);
 
   const toggle = useCallback(() => {
     if (listening) {
@@ -132,5 +217,6 @@ export function useVoiceInput({ language = "en-IN", onResult } = {}) {
     start,
     stop,
     toggle,
+    resetTranscript,
   };
 }

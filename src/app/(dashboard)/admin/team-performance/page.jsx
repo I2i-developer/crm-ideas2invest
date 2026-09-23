@@ -33,6 +33,7 @@ import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import PageHeader from "@/components/PageHeader";
 import BrandLoader from "@/components/BrandLoader";
+import FormInput from "../clients/components/FormInput";
 import FormSelect from "../clients/components/FormSelect";
 import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 
@@ -402,7 +403,14 @@ export default function TeamPerformancePage() {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[["date_from", "Assigned From"], ["date_to", "Assigned To"], ["due_from", "Due From"], ["due_to", "Due To"], ["completed_from", "Completed From"], ["completed_to", "Completed To"]].map(([name, label]) => (
-            <label key={name} className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}<input type="date" value={filters[name]} onChange={(event) => setFilter(name, event.target.value)} className="mt-1 block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50" /></label>
+            <FormInput
+              key={name}
+              label={label}
+              name={name}
+              type="date"
+              value={filters[name]}
+              onValueChange={(value) => setFilter(name, value)}
+            />
           ))}
           <div className="flex items-end gap-2">
             <button type="button" onClick={applyFilters} className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"><BarChart3 size={16} /> Apply</button>

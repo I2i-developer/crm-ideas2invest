@@ -4,6 +4,14 @@ import { writeAuditLog } from "@/lib/audit/logger";
 import { getAdminUserIds, createNotification } from "@/lib/notifications/service";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
+import {
+  DEFAULT_SIP_REPORT_RTA,
+  DEFAULT_SIP_REPORT_TYPE,
+  getSipReportRta,
+  getSipReportType,
+  sipReportRtaLabel,
+  sipReportTypeLabel,
+} from "@/lib/crm/sipReportTypes";
 
 export const SIP_FOLLOW_UP_STATUSES = [
   "pending",
@@ -45,11 +53,20 @@ const FIELD_MAP = {
 };
 
 const REQUIRED_HEADERS = ["INVNAME", "ACNO"];
+const REPORT_REQUIRED_HEADERS = {
+  kfintech_sip_stp: REQUIRED_HEADERS,
+  kfintech_termination_pause: ["INVNAME", "ACNO", "TRTYPE", "STARTDATE", "ENDDATE", "IHNO"],
+  kfintech_transaction_rejection: ["NAME", "ACNO", "TRDATE", "REMARKS"],
+  kfintech_closed_sip_stp: ["INVNAME", "ACNO", "FROMDATE", "TODATE", "SIPREGDT", "IHNO", "TRTYPE"],
+  kfintech_sip_stp_expiring: ["NAME", "ACNO", "ENDDATE", "TRTYPE", "IHNO"],
+  cams_unoperational_sip_stp: ["PRODUCT", "SCHEME", "FOLIO_NO", "INV_NAME", "AUTO_AMOUN", "FROM_DATE", "CEASE_DATE", "PAN"],
+};
 const DATE_FIELDS = new Set(["start_date", "end_date", "termination_date", "sip_registration_date"]);
 
 function normalizeHeader(header) {
   return String(header || "")
     .trim()
+    .split(",")[0]
     .replace(/[^a-zA-Z0-9]/g, "")
     .toUpperCase();
 }
@@ -58,6 +75,17 @@ function trimValue(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();
   return text === "" ? null : text;
+}
+
+function rawValue(rawRow, candidates) {
+  if (!rawRow) return null;
+  const normalizedCandidates = candidates.map(normalizeHeader);
+  const entry = Object.entries(rawRow).find(([key, value]) =>
+    value !== null &&
+    value !== undefined &&
+    normalizedCandidates.includes(normalizeHeader(key))
+  );
+  return entry ? trimValue(entry[1]) : null;
 }
 
 export function normalizeMobile(value) {
@@ -76,6 +104,30 @@ function parseAmount(value) {
   if (value === null || value === undefined || value === "") return null;
   const amount = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(amount) ? amount : null;
+}
+
+function normalizePan(value) {
+  const text = trimValue(value);
+  return text ? text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() : null;
+}
+
+function displayFrequencyLabel(value) {
+  const text = String(value || "").trim().toUpperCase();
+  if (text === "D") return "Daily";
+  if (text === "OM" || text === "M") return "Monthly";
+  if (text === "Q") return "Quarterly";
+  if (text === "W" || text === "OW") return "Weekly";
+  return trimValue(value);
+}
+
+function cleanCamsRemark(value) {
+  const cleaned = String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return null;
+  if (/^this is a systematic transaction exchange\/channel\.?$/i.test(cleaned)) return null;
+  return cleaned;
 }
 
 function excelSerialToDate(serial) {
@@ -165,10 +217,20 @@ function isNormalSipRow(row) {
 
 function stableFingerprint(row) {
   const parts = [
+    row.report_rta,
+    row.report_type,
     row.folio_no,
     row.sip_registration_no,
+    rawValue(row.raw_row, ["TRNO"]),
+    rawValue(row.raw_row, ["IHNO"]),
+    rawValue(row.raw_row, ["CHQNO"]),
+    rawValue(row.raw_row, ["AUTO_TRNO"]),
+    rawValue(row.raw_row, ["REQUEST_RE"]),
     row.product_code,
+    row.pan_number,
     row.amount,
+    row.start_date,
+    row.end_date,
     row.termination_date,
     row.sip_flag,
     row.remarks,
@@ -178,8 +240,12 @@ function stableFingerprint(row) {
   return crypto.createHash("sha256").update(parts.join("|")).digest("hex");
 }
 
-function normalizeRow(rawRow) {
-  const normalized = { raw_row: rawRow };
+function normalizeRow(rawRow, { reportRta, reportType } = {}) {
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
+    report_type: reportType || DEFAULT_SIP_REPORT_TYPE,
+  };
 
   for (const [rawHeader, value] of Object.entries(rawRow)) {
     const mappedKey = FIELD_MAP[normalizeHeader(rawHeader)];
@@ -198,21 +264,244 @@ function normalizeRow(rawRow) {
   return normalized;
 }
 
-function rowHasRequiredHeaders(row = []) {
-  const headers = row.map(normalizeHeader);
-  return REQUIRED_HEADERS.every((header) => headers.includes(header));
+function normalizeKfintechTransactionRejectionRow(rawRow, { reportRta, reportType } = {}) {
+  const fundCode = rawValue(rawRow, ["Fund"]);
+  const schemeCode = rawValue(rawRow, ["Scheme"]);
+  const planCode = rawValue(rawRow, ["Pln", "Plan"]);
+  const schemeDescription = rawValue(rawRow, ["Schdesc"]) || schemeCode;
+  const planDescription = rawValue(rawRow, ["Plandesc"]) || planCode;
+  const phone = rawValue(rawRow, ["Phone", "Mobile"]);
+  const transactionNo = rawValue(rawRow, ["Trno"]);
+  const sipReference = rawValue(rawRow, ["Ihno", "SIPREGSLNO"]);
+
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
+    report_type: reportType || "kfintech_transaction_rejection",
+    fund: schemeDescription,
+    scheme: schemeDescription,
+    plan: planDescription,
+    product_code: [fundCode, schemeCode, planCode].filter(Boolean).join("-") || null,
+    folio_no: rawValue(rawRow, ["Acno"]),
+    amount: parseAmount(rawValue(rawRow, ["Amount"])),
+    start_date: parseReportDate(rawValue(rawRow, ["FromDate"])),
+    end_date: parseReportDate(rawValue(rawRow, ["ToDate"])),
+    termination_date: parseReportDate(rawValue(rawRow, ["TrDate"])),
+    frequency: rawValue(rawRow, ["Frequency"]),
+    agent: rawValue(rawRow, ["Agent"]),
+    agent_name: rawValue(rawRow, ["Agentname", "AgentName"]),
+    subbroker: rawValue(rawRow, ["SubBrok", "SubBroker"]),
+    branch_code: rawValue(rawRow, ["Branch", "BranchCode"]),
+    investor_name: rawValue(rawRow, ["Name", "InvName"]),
+    email: normalizeEmail(rawValue(rawRow, ["Email"])),
+    phone: normalizeMobile(phone) || phone,
+    mobile: normalizeMobile(phone),
+    remarks: rawValue(rawRow, ["Remarks"]),
+    rejection_remarks: rawValue(rawRow, ["Remarks"]),
+    sip_registration_date: parseReportDate(rawValue(rawRow, ["sipregdt", "SIPREGDT"])),
+    ihno: sipReference,
+    sip_registration_no: [sipReference, transactionNo].filter(Boolean).join("-") || sipReference || null,
+    event_type: "rejected",
+  };
+
+  normalized.row_fingerprint = stableFingerprint(normalized);
+  return normalized;
 }
 
-function buildRowsFromHeaderMatrix(matrix = []) {
-  const headerIndex = matrix.findIndex(rowHasRequiredHeaders);
+function normalizeKfintechActiveSipStpRow(rawRow, { reportRta, reportType } = {}) {
+  const transactionType = rawValue(rawRow, ["TrType", "SIPFlag"]) || "SIP/STP";
+  const frequency = rawValue(rawRow, ["Freq", "Frequency"]);
+  const paidInstallments = rawValue(rawRow, ["PAIDINST"]);
+  const pendingInstallments = rawValue(rawRow, ["PENDINST"]);
+  const totalInstallments = rawValue(rawRow, ["INSTALNO"]);
+  const remarks = cleanCamsRemark(rawValue(rawRow, ["REMARKS"]));
+  const offPhone = rawValue(rawRow, ["OffPhone"]);
+  const resPhone = rawValue(rawRow, ["ResPhone"]);
+  const phone = offPhone || resPhone;
+  const stpTarget = [
+    rawValue(rawRow, ["STPInScheme"]),
+    rawValue(rawRow, ["StpInPlan"]),
+    rawValue(rawRow, ["StpInProdCode"]),
+  ].filter(Boolean).join(" / ");
+  const installmentText = [paidInstallments, totalInstallments].filter(Boolean).join("/");
+
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
+    report_type: reportType || "kfintech_termination_pause",
+    fund: rawValue(rawRow, ["SchDesc"]) || rawValue(rawRow, ["Fund"]),
+    scheme: rawValue(rawRow, ["SchDesc"]) || rawValue(rawRow, ["SchCode"]),
+    plan: rawValue(rawRow, ["SchCode"]),
+    product_code: rawValue(rawRow, ["Prodcode", "ProdCode"]) || rawValue(rawRow, ["SchCode"]),
+    folio_no: rawValue(rawRow, ["Acno"]),
+    amount: parseAmount(rawValue(rawRow, ["AMOUNT", "Amount"])),
+    start_date: parseReportDate(rawValue(rawRow, ["STARTDATE", "StartDate"])),
+    end_date: parseReportDate(rawValue(rawRow, ["ENDDATE", "EndDate"])),
+    frequency,
+    agent: rawValue(rawRow, ["Agent"]),
+    subbroker: rawValue(rawRow, ["SubBroker", "SubBrok"]),
+    investor_name: rawValue(rawRow, ["InvName", "Name"]),
+    email: normalizeEmail(rawValue(rawRow, ["Email"])),
+    mobile: normalizeMobile(phone),
+    phone: normalizeMobile(phone) || phone,
+    remarks: remarks || `${transactionType} active${installmentText ? `; installments ${installmentText}` : ""}${pendingInstallments ? `; pending ${pendingInstallments}` : ""}${stpTarget ? `; target ${stpTarget}` : ""}`,
+    sip_flag: transactionType,
+    sip_registration_date: parseReportDate(rawValue(rawRow, ["RegDate", "sipregdt", "SIPREGDT"])),
+    ihno: rawValue(rawRow, ["IHNO", "Ihno"]),
+    sip_registration_no: rawValue(rawRow, ["IHNO", "Ihno"]),
+    to_scheme: rawValue(rawRow, ["STPInScheme"]),
+    to_plan: rawValue(rawRow, ["StpInPlan"]),
+    to_product_code: rawValue(rawRow, ["StpInProdCode"]),
+    event_type: "active",
+  };
+
+  normalized.row_fingerprint = stableFingerprint(normalized);
+  return normalized;
+}
+
+function normalizeKfintechSipStpExpiringRow(rawRow, { reportRta, reportType } = {}) {
+  const fundCode = rawValue(rawRow, ["Fund"]);
+  const schemeCode = rawValue(rawRow, ["Scheme"]);
+  const planCode = rawValue(rawRow, ["Pln", "Plan"]);
+  const productCode = rawValue(rawRow, ["prcode", "ProdCode"]) || [fundCode, schemeCode, planCode].filter(Boolean).join("-");
+  const schemeDescription = rawValue(rawRow, ["Schdesc"]) || schemeCode;
+  const planDescription = rawValue(rawRow, ["Plandesc"]) || planCode;
+  const mobile = rawValue(rawRow, ["Mobile", "Phone"]);
+  const trType = rawValue(rawRow, ["TrType", "SIPFlag"]) || "SIP/STP";
+  const endDate = parseReportDate(rawValue(rawRow, ["EndDate"]));
+  const toScheme = rawValue(rawRow, ["ToScheme"]);
+  const toPlan = rawValue(rawRow, ["ToPlan"]);
+  const target = [toScheme, toPlan].filter(Boolean).join(" / ");
+
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
+    report_type: reportType || "kfintech_sip_stp_expiring",
+    fund: schemeDescription,
+    scheme: schemeDescription,
+    plan: planDescription,
+    product_code: productCode || null,
+    folio_no: rawValue(rawRow, ["Acno"]),
+    amount: parseAmount(rawValue(rawRow, ["Amount"])),
+    start_date: parseReportDate(rawValue(rawRow, ["Startdate", "StartDate"])),
+    end_date: endDate,
+    frequency: rawValue(rawRow, ["Frequency"]),
+    agent: rawValue(rawRow, ["Agent"]),
+    agent_name: rawValue(rawRow, ["Agentname", "AgentName"]),
+    subbroker: rawValue(rawRow, ["SubBroker", "SubBrok"]),
+    branch_code: rawValue(rawRow, ["Branch", "BranchCode"]),
+    investor_name: rawValue(rawRow, ["Name", "InvName"]),
+    email: normalizeEmail(rawValue(rawRow, ["Email"])),
+    mobile: normalizeMobile(mobile),
+    phone: normalizeMobile(mobile) || mobile,
+    remarks: `${trType} expiring${endDate ? ` on ${endDate}` : ""}${target ? `; target ${target}` : ""}`,
+    sip_flag: trType,
+    sip_registration_date: parseReportDate(rawValue(rawRow, ["sipregdt", "SIPREGDT"])),
+    ihno: rawValue(rawRow, ["Ihno", "IHNO"]),
+    sip_registration_no: rawValue(rawRow, ["Ihno", "IHNO"]),
+    to_scheme: toScheme,
+    to_plan: toPlan,
+    event_type: "expiring",
+  };
+
+  normalized.row_fingerprint = stableFingerprint(normalized);
+  return normalized;
+}
+
+function normalizeKfintechClosedSipStpRow(rawRow, { reportRta, reportType } = {}) {
+  const fundCode = rawValue(rawRow, ["FundCode", "Fund"]);
+  const schemeCode = rawValue(rawRow, ["Scheme"]);
+  const planCode = rawValue(rawRow, ["Pln", "Plan"]);
+  const productCode = rawValue(rawRow, ["PrCode", "ProdCode"]) || [fundCode, schemeCode, planCode].filter(Boolean).join("-");
+  const transactionType = rawValue(rawRow, ["TrType", "SIPFlag"]) || "SIP/STP";
+  const mobile = rawValue(rawRow, ["Mobile", "Phone"]);
+  const officePhone = rawValue(rawRow, ["OPhone", "OffPhone"]);
+  const residencePhone = rawValue(rawRow, ["RPhone", "ResPhone"]);
+  const phone = mobile || officePhone || residencePhone;
+  const fromDate = parseReportDate(rawValue(rawRow, ["FromDate", "StartDate"]));
+  const toDate = parseReportDate(rawValue(rawRow, ["ToDate", "EndDate"]));
+
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
+    report_type: reportType || "kfintech_closed_sip_stp",
+    fund: fundCode,
+    scheme: [schemeCode, planCode].filter(Boolean).join(" / ") || schemeCode || productCode,
+    plan: planCode,
+    product_code: productCode || null,
+    folio_no: rawValue(rawRow, ["Acno"]),
+    amount: parseAmount(rawValue(rawRow, ["Amount"])),
+    start_date: fromDate,
+    end_date: toDate,
+    termination_date: toDate,
+    frequency: rawValue(rawRow, ["Frequency"]),
+    investor_name: rawValue(rawRow, ["InvName", "Name"]),
+    email: normalizeEmail(rawValue(rawRow, ["Email"])),
+    mobile: normalizeMobile(mobile),
+    phone: normalizeMobile(phone) || phone,
+    remarks: `${transactionType} closed${toDate ? ` on ${toDate}` : ""}${productCode ? `; product ${productCode}` : ""}`,
+    sip_flag: transactionType,
+    sip_registration_date: parseReportDate(rawValue(rawRow, ["SipRegDt", "SIPREGDT", "RegDate"])),
+    ihno: rawValue(rawRow, ["IHno", "IHNO"]),
+    sip_registration_no: rawValue(rawRow, ["IHno", "IHNO"]),
+    event_type: "closed",
+  };
+
+  normalized.row_fingerprint = stableFingerprint(normalized);
+  return normalized;
+}
+
+function normalizeCamsUnoperationalSipStpRow(rawRow, { reportRta, reportType } = {}) {
+  const transactionCode = rawValue(rawRow, ["AUT_TRNTYP"]);
+  const autoTransactionNo = rawValue(rawRow, ["AUTO_TRNO"]);
+  const requestReference = rawValue(rawRow, ["REQUEST_RE"]);
+  const frequency = rawValue(rawRow, ["PERIODICIT"]);
+  const periodDay = rawValue(rawRow, ["PERIOD_DAY"]);
+  const remarks = rawValue(rawRow, ["REMARKS"]);
+  const ceaseDate = parseReportDate(rawValue(rawRow, ["CEASE_DATE"]));
+  const frequencyText = displayFrequencyLabel(frequency);
+
+  const normalized = {
+    raw_row: rawRow,
+    report_rta: reportRta || "cams",
+    report_type: reportType || "cams_unoperational_sip_stp",
+    fund: rawValue(rawRow, ["SCHEME"]),
+    scheme: rawValue(rawRow, ["SCHEME"]),
+    product_code: rawValue(rawRow, ["PRODUCT"]),
+    folio_no: rawValue(rawRow, ["FOLIO_NO"]),
+    amount: parseAmount(rawValue(rawRow, ["AUTO_AMOUN"])),
+    start_date: parseReportDate(rawValue(rawRow, ["FROM_DATE"])),
+    end_date: parseReportDate(rawValue(rawRow, ["TO_DATE"])),
+    termination_date: ceaseDate,
+    frequency,
+    investor_name: rawValue(rawRow, ["INV_NAME"]),
+    remarks: remarks || `CAMS un-operational ${frequencyText || "SIP/STP"}${periodDay ? ` on day ${periodDay}` : ""}${ceaseDate ? `; cease date ${ceaseDate}` : ""}`,
+    sip_flag: transactionCode ? `CAMS ${transactionCode}` : "CAMS SIP/STP",
+    ihno: autoTransactionNo,
+    sip_registration_no: requestReference || autoTransactionNo,
+    pan_number: normalizePan(rawValue(rawRow, ["PAN"])),
+    event_type: "unoperational",
+  };
+
+  normalized.row_fingerprint = stableFingerprint(normalized);
+  return normalized;
+}
+
+function rowHasRequiredHeaders(row = [], requiredHeaders = REQUIRED_HEADERS) {
+  const headers = row.map(normalizeHeader);
+  return requiredHeaders.map(normalizeHeader).every((header) => headers.includes(header));
+}
+
+function buildRowsFromHeaderMatrix(matrix = [], requiredHeaders = REQUIRED_HEADERS, reportLabel = "SIP report") {
+  const headerIndex = matrix.findIndex((row) => rowHasRequiredHeaders(row, requiredHeaders));
   if (headerIndex === -1) {
     const availableHeaders = matrix
       .slice(0, 12)
       .flat()
       .map(normalizeHeader)
       .filter(Boolean);
-    const missing = REQUIRED_HEADERS.filter((header) => !availableHeaders.includes(header));
-    throw new Error(`Missing required SIP report columns: ${missing.join(", ")}`);
+    const missing = requiredHeaders.filter((header) => !availableHeaders.includes(normalizeHeader(header)));
+    throw new Error(`Missing required ${reportLabel} columns: ${missing.join(", ")}`);
   }
 
   const headers = matrix[headerIndex].map((header, index) => {
@@ -232,11 +521,80 @@ function buildRowsFromHeaderMatrix(matrix = []) {
     .filter((row) => Object.values(row).some((value) => trimValue(value)));
 }
 
+function normalizeRowsForReport(rows, selection) {
+  if (selection.reportType === "kfintech_termination_pause") {
+    const activeRows = rows.map((row) => normalizeKfintechActiveSipStpRow(row, selection));
+    if (!activeRows.length) {
+      throw new Error("No active SIP/STP rows found.");
+    }
+    return activeRows;
+  }
+
+  if (selection.reportType === "kfintech_transaction_rejection") {
+    const rejectedRows = rows.map((row) => normalizeKfintechTransactionRejectionRow(row, selection));
+    if (!rejectedRows.length) {
+      throw new Error("No transaction-level SIP rejection rows found.");
+    }
+    return rejectedRows;
+  }
+
+  if (selection.reportType === "kfintech_sip_stp_expiring") {
+    const expiringRows = rows.map((row) => normalizeKfintechSipStpExpiringRow(row, selection));
+    if (!expiringRows.length) {
+      throw new Error("No SIP/STP expiring rows found.");
+    }
+    return expiringRows;
+  }
+
+  if (selection.reportType === "kfintech_closed_sip_stp") {
+    const closedRows = rows.map((row) => normalizeKfintechClosedSipStpRow(row, selection));
+    if (!closedRows.length) {
+      throw new Error("No closed SIP/STP rows found.");
+    }
+    return closedRows;
+  }
+
+  if (selection.reportType === "cams_unoperational_sip_stp") {
+    const unoperationalRows = rows.map((row) => normalizeCamsUnoperationalSipStpRow(row, selection));
+    if (!unoperationalRows.length) {
+      throw new Error("No CAMS un-operational SIP/STP rows found.");
+    }
+    return unoperationalRows;
+  }
+
+  const sipRows = rows.map((row) => normalizeRow(row, selection)).filter(isNormalSipRow);
+  if (!sipRows.length) {
+    throw new Error("No Normal SIP rows found. Normal STP rows are ignored by the SIP tracker.");
+  }
+  return sipRows;
+}
+
 export function fileHash(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
-export async function parseSipReportFile({ buffer, fileName }) {
+function normalizeReportSelection({ reportRta, reportType } = {}) {
+  const selectedType = getSipReportType(reportType || DEFAULT_SIP_REPORT_TYPE);
+  if (!selectedType) {
+    throw new Error("Invalid SIP report type selected.");
+  }
+  const selectedRta = getSipReportRta(reportRta || selectedType.rta || DEFAULT_SIP_REPORT_RTA);
+  if (!selectedRta || selectedRta.value !== selectedType.rta) {
+    throw new Error("Selected RTA does not match the selected SIP report type.");
+  }
+  if (!selectedType.supported) {
+    throw new Error(`${selectedType.label} import is not configured yet. Upload a sample CSV first so its columns can be mapped.`);
+  }
+  return {
+    reportRta: selectedRta.value,
+    reportType: selectedType.value,
+    reportLabel: selectedType.label,
+    rtaLabel: selectedRta.label,
+  };
+}
+
+export async function parseSipReportFile({ buffer, fileName, reportRta, reportType }) {
+  const selection = normalizeReportSelection({ reportRta, reportType });
   const extension = String(fileName || "").split(".").pop()?.toLowerCase();
   if (!["xlsx", "xls", "csv", "txt"].includes(extension)) {
     throw new Error("Unsupported file type. Upload .xlsx, .xls, or .csv.");
@@ -258,15 +616,11 @@ export async function parseSipReportFile({ buffer, fileName }) {
     blankrows: false,
     raw: true,
   });
-  const rows = buildRowsFromHeaderMatrix(matrix);
+  const requiredHeaders = REPORT_REQUIRED_HEADERS[selection.reportType] || REQUIRED_HEADERS;
+  const rows = buildRowsFromHeaderMatrix(matrix, requiredHeaders, selection.reportLabel);
   if (!rows.length) throw new Error("Uploaded SIP report is empty.");
 
-  const sipRows = rows.map(normalizeRow).filter(isNormalSipRow);
-  if (!sipRows.length) {
-    throw new Error("No Normal SIP rows found. Normal STP rows are ignored by the SIP tracker.");
-  }
-
-  return sipRows;
+  return { rows: normalizeRowsForReport(rows, selection), selection };
 }
 
 function normalizeName(value = "") {
@@ -283,6 +637,7 @@ function similarName(a, b) {
 async function findClientMatch(supabase, event) {
   const mobile = normalizeMobile(event.mobile || event.phone);
   const email = normalizeEmail(event.email);
+  const pan = normalizePan(event.pan_number || rawValue(event.raw_row, ["PAN"]));
 
   if (mobile) {
     const { data } = await supabase
@@ -317,6 +672,32 @@ async function findClientMatch(supabase, event) {
         match_confidence: "high",
         match_reason: "Exact email match",
       };
+    }
+  }
+
+  if (pan) {
+    const { data: holder } = await supabase
+      .from("client_holders")
+      .select("client_id")
+      .ilike("pan", pan)
+      .limit(1)
+      .maybeSingle();
+
+    if (holder?.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("id, full_name, operations_owner, mobile, email")
+        .eq("id", holder.client_id)
+        .maybeSingle();
+
+      if (client) {
+        return {
+          client,
+          matched_status: "matched",
+          match_confidence: "high",
+          match_reason: "Exact PAN match",
+        };
+      }
     }
   }
 
@@ -358,7 +739,7 @@ async function findClientMatch(supabase, event) {
     client: null,
     matched_status: "unmatched",
     match_confidence: null,
-    match_reason: "No mobile, email, folio, or reliable name match",
+    match_reason: "No mobile, email, PAN, or reliable name match",
   };
 }
 
@@ -382,17 +763,25 @@ export async function resolveSipAssignee(supabase, client) {
 }
 
 function taskDescription(event) {
-  const frequency = String(event.frequency || "").trim().toUpperCase() === "D" ? "Daily" : event.frequency;
+  const frequency = displayFrequencyLabel(event.frequency);
+  const dateLines = event.report_type === "cams_unoperational_sip_stp"
+    ? [
+        `From Date: ${formatDateDDMonYYYY(event.start_date, "-")}`,
+        `To Date: ${formatDateDDMonYYYY(event.end_date, "-")}`,
+        `Cease Date: ${formatDateDDMonYYYY(event.termination_date, "-")}`,
+      ]
+    : [`Date: ${formatDateDDMonYYYY(event.termination_date || event.end_date, "-")}`];
   return [
     `Investor: ${event.investor_name || "Unknown"}`,
     `Event: ${event.event_type}`,
     `Fund: ${event.fund || "-"}`,
     `Scheme: ${event.scheme || "-"}`,
     `Folio: ${event.folio_no || "-"}`,
+    `PAN: ${event.pan_number || rawValue(event.raw_row, ["PAN"]) || "-"}`,
     `Amount: ${event.amount || "-"}`,
     `Frequency: ${frequency || "-"}`,
-    `Date: ${formatDateDDMonYYYY(event.termination_date || event.end_date, "-")}`,
-    `Remarks: ${event.remarks || "-"}`,
+    ...dateLines,
+    `Remarks: ${cleanCamsRemark(event.remarks) || event.remarks || "-"}`,
     `Rejection Remarks: ${event.rejection_remarks || "-"}`,
   ].join("\n");
 }
@@ -410,7 +799,7 @@ async function createSipTaskAndNotifications({ supabase, actor, profile, event, 
       title,
       description: taskDescription(event),
       category: "Follow-up",
-      priority: event.event_type === "terminated" ? "High" : "Medium",
+      priority: ["terminated", "rejected", "unoperational"].includes(event.event_type) ? "High" : "Medium",
       status: "Pending",
       due_date: today,
       client_id: client?.id || null,
@@ -519,7 +908,17 @@ export async function createSipFollowupTask({ supabase, actor, profile, eventId,
   return { event: updatedEvent, task: result.task, notification: result.notification, alreadyExists: false };
 }
 
-export async function importSipReport({ supabase, actor, profile, fileName, buffer, sourceType = "manual_upload", request }) {
+export async function importSipReport({
+  supabase,
+  actor,
+  profile,
+  fileName,
+  buffer,
+  sourceType = "manual_upload",
+  reportRta = DEFAULT_SIP_REPORT_RTA,
+  reportType = DEFAULT_SIP_REPORT_TYPE,
+  request,
+}) {
   const taskDb = getTaskDataClient(supabase);
   const hash = fileHash(buffer);
   const { data: existingImport } = await taskDb
@@ -529,17 +928,25 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
     .eq("import_status", "completed")
     .maybeSingle();
 
-  const rows = await parseSipReportFile({ buffer, fileName });
+  const parsedReport = await parseSipReportFile({ buffer, fileName, reportRta, reportType });
+  const rows = parsedReport.rows;
+  const selection = parsedReport.selection;
   const { data: importRow, error: importError } = await taskDb
     .from("sip_report_imports")
     .insert({
       source_type: sourceType,
+      report_rta: selection.reportRta,
+      report_type: selection.reportType,
       file_name: fileName,
       file_hash: hash,
       imported_by: actor.id,
       import_status: "processing",
       total_rows: rows.length,
-      metadata: existingImport ? { duplicate_file_of: existingImport.id } : {},
+      metadata: {
+        report_label: selection.reportLabel,
+        rta_label: selection.rtaLabel,
+        ...(existingImport ? { duplicate_file_of: existingImport.id } : {}),
+      },
     })
     .select()
     .single();
@@ -575,6 +982,8 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
       const eventPayload = {
         ...row,
         import_id: importRow.id,
+        report_rta: selection.reportRta,
+        report_type: selection.reportType,
         client_id: client?.id || null,
         matched_status: match.matched_status,
         match_confidence: match.match_confidence,
@@ -590,6 +999,14 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
 
       if (eventError) {
         if (eventError.code === "23505") summary.duplicate_records += 1;
+        else if (
+          eventError.code === "23514" &&
+          String(eventError.message || "").includes("sip_events_event_type_check")
+        ) {
+          throw new Error(
+            "Database migration required: sip_events_event_type_check must allow the 'closed' event type before importing Closed SIP/STP reports."
+          );
+        }
         else throw new Error(eventError.message);
         continue;
       }
@@ -598,7 +1015,7 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
       if (match.matched_status === "matched") summary.matched_rows += 1;
       else summary.unmatched_rows += 1;
 
-      if (client && ["terminated", "paused", "rejected"].includes(event.event_type)) {
+      if (client && ["terminated", "paused", "rejected", "expiring", "closed", "unoperational"].includes(event.event_type)) {
         const taskResult = await createSipTaskAndNotifications({
           supabase,
           actor,
@@ -648,7 +1065,7 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
       createNotification(taskDb, {
         userId: adminId,
         title: "SIP report imported",
-        message: `${fileName}: ${summary.new_records} new, ${summary.duplicate_records} duplicates, ${summary.unmatched_rows} unmatched.`,
+        message: `${sipReportRtaLabel(selection.reportRta)} ${sipReportTypeLabel(selection.reportType)}: ${summary.new_records} new, ${summary.duplicate_records} duplicates, ${summary.unmatched_rows} unmatched.`,
         type: "sip_report_imported",
         entityType: "sip_import",
         entityId: importRow.id,
@@ -669,5 +1086,13 @@ export async function importSipReport({ supabase, actor, profile, fileName, buff
     request,
   });
 
-  return { import_id: importRow.id, duplicate_file: Boolean(existingImport), ...summary };
+  return {
+    import_id: importRow.id,
+    duplicate_file: Boolean(existingImport),
+    report_rta: selection.reportRta,
+    report_type: selection.reportType,
+    report_label: selection.reportLabel,
+    rta_label: selection.rtaLabel,
+    ...summary,
+  };
 }

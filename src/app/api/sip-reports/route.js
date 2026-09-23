@@ -33,6 +33,8 @@ function matchesSearch(event, search) {
     event.mobile,
     event.email,
     event.phone,
+    event.pan_number,
+    event.sip_flag,
     event.folio_no,
     event.scheme,
     event.fund,
@@ -50,17 +52,17 @@ function rawValue(rawRow, candidates) {
   const entry = Object.entries(rawRow).find(([key, value]) =>
     value !== null &&
     value !== undefined &&
-    normalizedCandidates.includes(String(key).replace(/[^a-zA-Z0-9]/g, "").toUpperCase())
+    normalizedCandidates.includes(String(key).split(",")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase())
   );
   return entry ? entry[1] : null;
 }
 
 function correctedEventDates(event) {
   return {
-    start_date: parseReportDate(rawValue(event.raw_row, ["STARTDATE"])) || event.start_date,
-    end_date: parseReportDate(rawValue(event.raw_row, ["ENDDATE"])) || event.end_date,
-    termination_date: parseReportDate(rawValue(event.raw_row, ["TERMDATE"])) || event.termination_date,
-    sip_registration_date: parseReportDate(rawValue(event.raw_row, ["SIPREGDT"])) || event.sip_registration_date,
+    start_date: parseReportDate(rawValue(event.raw_row, ["STARTDATE", "FROMDATE"])) || event.start_date,
+    end_date: parseReportDate(rawValue(event.raw_row, ["ENDDATE", "TODATE"])) || event.end_date,
+    termination_date: parseReportDate(rawValue(event.raw_row, ["TERMDATE", "CEASE_DATE"])) || event.termination_date,
+    sip_registration_date: parseReportDate(rawValue(event.raw_row, ["SIPREGDT", "REGDATE"])) || event.sip_registration_date,
   };
 }
 
@@ -75,20 +77,31 @@ function filterVisibleEvents(events, admin) {
 
 function buildSummary(events, userId) {
   const week = currentWeekBounds();
-  const isThisWeek = (event) =>
-    Boolean(event.termination_date) &&
-    event.termination_date >= week.start &&
-    event.termination_date <= week.end;
+  const isThisWeek = (event) => {
+    const eventDate = sipEventDate(event);
+    return Boolean(eventDate) && eventDate >= week.start && eventDate <= week.end;
+  };
   const unresolved = (event) => event.follow_up_status !== "resolved";
+  const startsThisWeek = (event) =>
+    Boolean(event.start_date) && event.start_date >= week.start && event.start_date <= week.end;
 
   return {
+    active_this_week: events.filter((event) => event.event_type === "active" && startsThisWeek(event)).length,
     terminated_this_week: events.filter((event) => event.event_type === "terminated" && isThisWeek(event)).length,
     paused_this_week: events.filter((event) => event.event_type === "paused" && isThisWeek(event)).length,
     rejected_this_week: events.filter((event) => event.event_type === "rejected" && isThisWeek(event)).length,
+    closed_this_week: events.filter((event) => event.event_type === "closed" && isThisWeek(event)).length,
+    expiring_this_week: events.filter((event) => event.event_type === "expiring" && isThisWeek(event)).length,
+    unoperational_this_week: events.filter((event) => event.event_type === "unoperational" && isThisWeek(event)).length,
+    total_active: events.filter((event) => event.event_type === "active" && unresolved(event)).length,
     total_terminated: events.filter((event) => event.event_type === "terminated" && unresolved(event)).length,
     total_rejected: events.filter((event) => event.event_type === "rejected" && unresolved(event)).length,
+    total_closed: events.filter((event) => event.event_type === "closed" && unresolved(event)).length,
+    total_expiring: events.filter((event) => event.event_type === "expiring" && unresolved(event)).length,
+    total_unoperational: events.filter((event) => event.event_type === "unoperational" && unresolved(event)).length,
     total_resolved: events.filter((event) => event.follow_up_status === "resolved").length,
     pending_followups: events.filter((event) => event.follow_up_status === "pending").length,
+    matched_records: events.filter((event) => event.matched_status === "matched").length,
     unmatched_records: events.filter((event) => event.matched_status === "unmatched").length,
     assigned_to_me: events.filter((event) => event.assigned_to === userId).length,
     my_pending_followups: events.filter(
@@ -115,26 +128,51 @@ export async function GET(request) {
   const clientId = searchParams.get("client_id");
   const fund = searchParams.get("fund");
   const scheme = searchParams.get("scheme");
+  const reportRta = searchParams.get("report_rta");
+  const reportType = searchParams.get("report_type");
+  const transactionType = searchParams.get("transaction_type");
   const dateFrom = searchParams.get("date_from");
   const dateTo = searchParams.get("date_to");
   const search = searchParams.get("search");
 
-  let query = taskDb
-    .from("sip_events")
-    .select(
-      "*, clients(id, full_name, mobile, email), tasks(id, title, status, due_date)"
-    )
-    .order("created_at", { ascending: false });
+  const buildQuery = () => {
+    let query = taskDb
+      .from("sip_events")
+      .select(
+        "*, clients(id, full_name, mobile, email), tasks(id, title, status, due_date)"
+      )
+      .order("created_at", { ascending: false });
 
-  if (eventType && eventType !== "all") query = query.eq("event_type", eventType);
-  if (followUpStatus && followUpStatus !== "all") query = query.eq("follow_up_status", followUpStatus);
-  if (matchedStatus && matchedStatus !== "all") query = query.eq("matched_status", matchedStatus);
-  if (clientId) query = query.eq("client_id", clientId);
-  if (fund) query = query.ilike("fund", `%${fund}%`);
-  if (scheme) query = query.ilike("scheme", `%${scheme}%`);
-  if (admin && assignedUser && assignedUser !== "all") query = query.eq("assigned_to", assignedUser);
+    if (eventType && eventType !== "all") query = query.eq("event_type", eventType);
+    if (followUpStatus && followUpStatus !== "all") query = query.eq("follow_up_status", followUpStatus);
+    if (matchedStatus && matchedStatus !== "all") query = query.eq("matched_status", matchedStatus);
+    if (clientId) query = query.eq("client_id", clientId);
+    if (fund) query = query.ilike("fund", `%${fund}%`);
+    if (scheme) query = query.ilike("scheme", `%${scheme}%`);
+    if (reportRta && reportRta !== "all") query = query.eq("report_rta", reportRta);
+    if (reportType && reportType !== "all") query = query.eq("report_type", reportType);
+    if (transactionType && transactionType !== "all") query = query.ilike("sip_flag", transactionType);
+    if (admin && assignedUser && assignedUser !== "all") query = query.eq("assigned_to", assignedUser);
 
-  const { data, error } = await query.limit(clientId ? 50 : 500);
+    return query;
+  };
+
+  const maxRows = clientId ? 50 : 5000;
+  const pageSize = clientId ? 50 : 1000;
+  let data = [];
+  let error = null;
+
+  for (let start = 0; start < maxRows; start += pageSize) {
+    const end = Math.min(start + pageSize - 1, maxRows - 1);
+    const { data: batch, error: batchError } = await buildQuery().range(start, end);
+    if (batchError) {
+      error = batchError;
+      break;
+    }
+    data = [...data, ...(batch || [])];
+    if (!batch || batch.length < pageSize) break;
+  }
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

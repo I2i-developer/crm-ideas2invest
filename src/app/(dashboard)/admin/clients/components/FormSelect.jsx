@@ -79,6 +79,9 @@ export default function FormSelect({
           control: (base, state) => ({
             ...base,
             borderRadius: "12px",
+            fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
             padding: "0 4px",
             minHeight: "42px",
             backgroundColor: isDark ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.72)",
@@ -93,10 +96,14 @@ export default function FormSelect({
             ...base,
             padding: "2px 8px",
             color: isDark ? "#f8fafc" : "#111827",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
           }),
           singleValue: (base) => ({
             ...base,
             color: isDark ? "#f8fafc" : "#111827",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
           }),
           multiValue: (base) => ({
             ...base,
@@ -107,6 +114,8 @@ export default function FormSelect({
             ...base,
             color: isDark ? "#bbf7d0" : "#166534",
             fontWeight: 600,
+            fontSize: "0.8125rem",
+            lineHeight: "1.125rem",
           }),
           multiValueRemove: (base) => ({
             ...base,
@@ -119,6 +128,9 @@ export default function FormSelect({
           input: (base) => ({
             ...base,
             color: isDark ? "#f8fafc" : "#111827",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
+            fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
           }),
           indicatorsContainer: (base) => ({
             ...base,
@@ -163,6 +175,9 @@ export default function FormSelect({
 
           option: (base, state) => ({
             ...base,
+            fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
             backgroundColor: state.isSelected
               ? isDark ? "rgba(34, 197, 94, 0.24)" : "#bbf7d0"
               : state.isFocused
@@ -176,6 +191,8 @@ export default function FormSelect({
           placeholder: (base) => ({
             ...base,
             color: isDark ? "#94a3b8" : "#9ca3af",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
           }),
           noOptionsMessage: (base) => ({
             ...base,

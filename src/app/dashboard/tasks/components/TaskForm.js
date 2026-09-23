@@ -35,6 +35,32 @@ const STATUS_OPTIONS = [
   { value: "Cancelled", label: "Cancelled" },
 ];
 
+const VOICE_STOP_LABELS = [
+  "description",
+  "details",
+  "detail",
+  "remarks",
+  "remark",
+  "notes",
+  "note",
+  "priority",
+  "prathmikta",
+  "category",
+  "due",
+  "due date",
+  "deadline",
+  "kab tak",
+  "assign",
+  "assigned",
+  "assignee",
+  "assign to",
+  "kisko",
+  "client",
+  "customer",
+  "tags",
+  "tag",
+];
+
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -43,19 +69,25 @@ function parseDueDate(text) {
   const normalized = text.toLowerCase();
   const today = new Date();
 
-  if (/\bday after tomorrow\b/.test(normalized)) {
+  if (/\b(day after tomorrow|parso|parson|parsu)\b/.test(normalized)) {
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 2);
     return formatDate(dueDate);
   }
 
-  if (/\btomorrow\b/.test(normalized)) {
+  if (/\b(tomorrow|kal)\b/.test(normalized)) {
     const dueDate = new Date(today);
     dueDate.setDate(today.getDate() + 1);
     return formatDate(dueDate);
   }
 
-  if (/\btoday\b/.test(normalized)) return formatDate(today);
+  if (/\b(today|aaj)\b/.test(normalized)) return formatDate(today);
+
+  if (/\b(next week|agle hafte|agla hafta|next hafte)\b/.test(normalized)) {
+    const dueDate = new Date(today);
+    dueDate.setDate(today.getDate() + 7);
+    return formatDate(dueDate);
+  }
 
   const slashDate = normalized.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/);
   if (slashDate) {
@@ -78,21 +110,71 @@ function pickOption(text, options) {
   return options.find((option) => normalized.includes(option.label.toLowerCase()))?.value || "";
 }
 
+function pickPriority(text) {
+  const normalized = text.toLowerCase();
+  if (/\b(urgent|jaldi|turant|abhi|immediate|asap|bahut zaroori|bahut jaruri)\b/.test(normalized)) return "Urgent";
+  if (/\b(high|important|zaroori|jaruri|priority high|high priority)\b/.test(normalized)) return "High";
+  if (/\b(medium|normal|regular|theek|samanaya)\b/.test(normalized)) return "Medium";
+  if (/\b(low|later|baad mein|kam priority|low priority)\b/.test(normalized)) return "Low";
+  return pickOption(text, PRIORITY_OPTIONS);
+}
+
+function pickCategory(text) {
+  const normalized = text.toLowerCase();
+  if (/\bkyc\b/.test(normalized)) return "KYC";
+  if (/\b(follow up|follow-up|followup|call back|baat karni|phone karna|remind)\b/.test(normalized)) return "Follow-up";
+  if (/\b(verification|verify|check karna|confirm karna|verification karna)\b/.test(normalized)) return "Verification";
+  if (/\b(documentation|document|documents|docs|paper|papers|form|forms)\b/.test(normalized)) return "Documentation";
+  if (/\b(compliance|regulatory|audit)\b/.test(normalized)) return "Compliance";
+  if (/\b(internal|office|team)\b/.test(normalized)) return "Internal";
+  return pickOption(text, CATEGORY_OPTIONS);
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function extractSegment(text, labels, stopLabels = []) {
   const normalized = text.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
-  const labelPattern = labels.map((label) => label.toLowerCase()).join("|");
-  const match = lower.match(new RegExp(`\\b(${labelPattern})\\b[:\\s-]*`));
+  const labelPattern = labels.map((label) => escapeRegex(label.toLowerCase())).join("|");
+  const match = lower.match(new RegExp(`(?:^|\\s)(${labelPattern})(?:\\s|:|-)*`));
   if (!match) return "";
 
   const start = match.index + match[0].length;
   const rest = normalized.slice(start);
+  const restLower = rest.toLowerCase();
   const stopIndexes = stopLabels
-    .map((label) => rest.toLowerCase().indexOf(` ${label.toLowerCase()}`))
+    .flatMap((label) => {
+      const stop = label.toLowerCase();
+      return [` ${stop} `, ` ${stop}:`, ` ${stop}-`].map((pattern) => restLower.indexOf(pattern));
+    })
     .filter((index) => index > -1);
   const end = stopIndexes.length ? Math.min(...stopIndexes) : rest.length;
 
   return rest.slice(0, end).replace(/[.,;:]$/, "").trim();
+}
+
+function titleFromTranscript(transcript) {
+  const firstSentence = transcript.split(/[.!?]/)[0]?.trim();
+  const source = firstSentence || transcript;
+  return source.length > 180 ? `${source.slice(0, 177).trim()}...` : source;
+}
+
+function normalizedTokens(value = "") {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 3);
+}
+
+function textMentionsName(text, value) {
+  const haystack = String(text || "").toLowerCase();
+  const name = String(value || "").toLowerCase().trim();
+  if (!name) return false;
+  if (haystack.includes(name)) return true;
+  return normalizedTokens(name).some((token) => haystack.includes(token));
 }
 
 export default function TaskForm({ initialData = null, users = [], clients = [], onSubmit, isEdit = false }) {
@@ -118,37 +200,22 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
   const [voiceDraft, setVoiceDraft] = useState("");
 
   const applyVoiceTranscript = (transcript) => {
-    const stopLabels = [
-      "description",
-      "details",
-      "priority",
-      "category",
-      "due",
-      "deadline",
-      "assign",
-      "assigned",
-      "client",
-      "tags",
-      "tag",
-    ];
-
     const title =
-      extractSegment(transcript, ["title", "task"], stopLabels) ||
-      transcript.split(/[.]/)[0]?.slice(0, 120).trim();
-    const description = extractSegment(transcript, ["description", "details", "remarks"], stopLabels);
-    const tags = extractSegment(transcript, ["tags", "tag"], ["client", "assign", "due", "priority", "category"]);
-    const priority = pickOption(transcript, PRIORITY_OPTIONS);
-    const category = pickOption(transcript, CATEGORY_OPTIONS);
+      extractSegment(transcript, ["title", "task", "kaam", "work"], VOICE_STOP_LABELS) ||
+      titleFromTranscript(transcript);
+    const description =
+      extractSegment(transcript, ["description", "details", "detail", "remarks", "remark", "notes", "note"], VOICE_STOP_LABELS) ||
+      (transcript.length > title.length ? transcript : "");
+    const tags = extractSegment(transcript, ["tags", "tag"], VOICE_STOP_LABELS);
+    const priority = pickPriority(transcript);
+    const category = pickCategory(transcript);
     const dueDate = parseDueDate(transcript);
     const lowerTranscript = transcript.toLowerCase();
 
     const matchedUsers = users
-      .filter((user) => {
-        const names = [user.name, user.full_name, user.email].filter(Boolean).map((value) => value.toLowerCase());
-        return names.some((name) => lowerTranscript.includes(name));
-      })
+      .filter((user) => [user.name, user.full_name, user.email].filter(Boolean).some((name) => textMentionsName(lowerTranscript, name)))
       .map((user) => user.id);
-    const matchedClient = clients.find((client) => lowerTranscript.includes(String(client.full_name || "").toLowerCase()));
+    const matchedClient = clients.find((client) => textMentionsName(lowerTranscript, client.full_name));
 
     setVoiceDraft(transcript);
     setForm((current) => ({
@@ -165,8 +232,10 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
   };
 
   const voiceInput = useVoiceInput({
-    language: "en-IN",
+    language: "hi-IN",
     onResult: applyVoiceTranscript,
+    continuous: true,
+    restartOnSilence: true,
   });
 
   const handleChange = (e) => {
@@ -225,20 +294,22 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
           <div>
             <h3 className={styles.voiceTitle}>Voice Task Creation</h3>
             <p className={styles.voiceHint}>
-              Speak the task title, description, priority, due date, assignees, client, and tags. Review before saving.
+              Speak naturally in English or Hinglish. Longer dictation is captured continuously, then review before saving.
             </p>
           </div>
-          <CrmTooltip content={voiceInput.unsupported ? "Voice input is not supported in this browser" : "Dictate task details"}>
-            <button
-              type="button"
-              onClick={voiceInput.toggle}
-              disabled={voiceInput.unsupported}
-              className={`${styles.voiceButton} ${voiceInput.listening ? styles.voiceButtonActive : ""}`}
-            >
-              {voiceInput.listening ? <MicOff size={18} /> : <Mic size={18} />}
-              {voiceInput.listening ? "Listening..." : "Dictate Task"}
-            </button>
-          </CrmTooltip>
+          <div className={styles.voiceControls}>
+            <CrmTooltip content={voiceInput.unsupported ? "Voice input is not supported in this browser" : "Dictate task details"}>
+              <button
+                type="button"
+                onClick={voiceInput.toggle}
+                disabled={voiceInput.unsupported}
+                className={`${styles.voiceButton} ${voiceInput.listening ? styles.voiceButtonActive : ""}`}
+              >
+                {voiceInput.listening ? <MicOff size={18} /> : <Mic size={18} />}
+                {voiceInput.listening ? "Stop Dictation" : "Dictate Task"}
+              </button>
+            </CrmTooltip>
+          </div>
           {(voiceDraft || voiceInput.transcript) && (
             <p className={styles.voiceTranscript}>{voiceDraft || voiceInput.transcript}</p>
           )}

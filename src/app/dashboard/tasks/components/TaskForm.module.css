@@ -63,6 +63,13 @@
   transition: all 0.2s;
 }
 
+.voiceControls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .voiceButton:hover:not(:disabled) {
   background: #dbeafe;
   transform: translateY(-1px);
@@ -239,6 +246,14 @@
 
   .voicePanel {
     grid-template-columns: 1fr;
+  }
+
+  .voiceControls {
+    justify-content: stretch;
+  }
+
+  .voiceControls > * {
+    width: 100%;
   }
 }
 

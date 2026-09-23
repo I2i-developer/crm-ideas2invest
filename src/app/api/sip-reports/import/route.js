@@ -35,6 +35,8 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
+    const reportRta = String(formData.get("report_rta") || "").trim();
+    const reportType = String(formData.get("report_type") || "").trim();
 
     if (!file || typeof file.arrayBuffer !== "function") {
       return NextResponse.json({ error: "SIP report file is required" }, { status: 400 });
@@ -57,6 +59,8 @@ export async function POST(request) {
       fileName: file.name,
       buffer,
       sourceType: "manual_upload",
+      reportRta,
+      reportType,
       request,
     });
 
