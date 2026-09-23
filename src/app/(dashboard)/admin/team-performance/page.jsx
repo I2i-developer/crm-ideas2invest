@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  FileChartColumn,
   Eye,
   FilterX,
   RefreshCcw,
@@ -62,6 +63,37 @@ const DONE_BY_COLORS = [
   "border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-200",
   "border-cyan-100 bg-cyan-50 text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-500/15 dark:text-cyan-200",
 ];
+
+function todayKey() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
+
+function addDaysToKey(value, days) {
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
+
+function weekRangeFor(value) {
+  const date = new Date(`${value}T00:00:00`);
+  const mondayOffset = (date.getDay() + 6) % 7;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - mondayOffset);
+  const offset = monday.getTimezoneOffset();
+  const localMonday = new Date(monday.getTime() - offset * 60 * 1000);
+  const start = localMonday.toISOString().slice(0, 10);
+  return { start, end: addDaysToKey(start, 6) };
+}
+
+function filenameFromHeader(header, fallback) {
+  const match = String(header || "").match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+}
 
 function selfStatusClass(status) {
   const styles = {
@@ -193,11 +225,19 @@ function TrendChart({ values }) {
 }
 
 function SelfWorkActivityView({ tasks = [], summary, compact = false }) {
+  const pageSize = 20;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
   const counts = summary || {
     open: tasks.filter((task) => !["Done", "Cancelled"].includes(task.status)).length,
     done: tasks.filter((task) => task.status === "Done").length,
     total: tasks.length,
   };
+  const visibleTasks = tasks.slice(0, visibleCount);
+  const hasMoreTasks = tasks.length > visibleCount;
+
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [tasks]);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950">
@@ -248,7 +288,7 @@ function SelfWorkActivityView({ tasks = [], summary, compact = false }) {
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-slate-500 dark:text-slate-300">No self work entries found.</td>
               </tr>
-            ) : tasks.map((task) => (
+            ) : visibleTasks.map((task) => (
               <tr key={task.id} className="align-top transition hover:bg-blue-50/30 dark:hover:bg-blue-500/10">
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateDDMonYYYY(task.task_date, "-")}</td>
                 <td className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{task.owner?.name || "Operations"}</td>
@@ -272,6 +312,23 @@ function SelfWorkActivityView({ tasks = [], summary, compact = false }) {
           </tbody>
         </table>
       </div>
+      {tasks.length > pageSize && (
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500 dark:text-slate-300">
+            Showing <span className="font-semibold text-slate-800 dark:text-slate-100">{Math.min(visibleCount, tasks.length)}</span> of{" "}
+            <span className="font-semibold text-slate-800 dark:text-slate-100">{tasks.length}</span> entries
+          </p>
+          {hasMoreTasks && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((current) => Math.min(current + pageSize, tasks.length))}
+              className="inline-flex items-center justify-center rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 dark:border-blue-400/30 dark:bg-blue-500/15 dark:text-blue-100 dark:hover:bg-blue-500/25"
+            >
+              Show more
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -344,6 +401,12 @@ export default function TeamPerformancePage() {
   const [filters, setFilters] = useState(initialFilters);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [usagePeriod, setUsagePeriod] = useState("daily");
+  const [usageDate, setUsageDate] = useState(todayKey());
+  const maxUsageDate = todayKey();
+  const [usageFromDate, setUsageFromDate] = useState(() => weekRangeFor(todayKey()).start);
+  const [usageToDate, setUsageToDate] = useState(() => weekRangeFor(todayKey()).end);
+  const [usageDownloading, setUsageDownloading] = useState(false);
 
   const load = useCallback(async (nextFilters = filters) => {
     setLoading(true);
@@ -383,6 +446,51 @@ export default function TeamPerformancePage() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadUsageReport = async () => {
+    if (usagePeriod === "weekly") {
+      if (!usageFromDate || !usageToDate) {
+        toast.error("Please select From Date and To Date");
+        return;
+      }
+      if (usageFromDate > usageToDate) {
+        toast.error("From Date cannot be after To Date");
+        return;
+      }
+    } else if (!usageDate) {
+      toast.error("Please select Report Date");
+      return;
+    }
+
+    setUsageDownloading(true);
+    const query = new URLSearchParams({ period: usagePeriod });
+    if (usagePeriod === "weekly") {
+      query.set("date_from", usageFromDate);
+      query.set("date_to", usageToDate);
+    } else {
+      query.set("date", usageDate);
+    }
+    const response = await authFetch(`/api/admin/usage-report?${query.toString()}`);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setUsageDownloading(false);
+      toast.error(payload.error || "Usage report could not be generated");
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filenameFromHeader(response.headers.get("content-disposition"), `crm-usage-${usagePeriod}-${usagePeriod === "weekly" ? `${usageFromDate}-to-${usageToDate}` : usageDate}.pdf`);
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setUsageDownloading(false);
+    toast.success("Usage report downloaded");
+  };
+
   const filterSelects = useMemo(() => [
     ["user_id", "Operations User", options(data?.options?.users)],
     ["status", "Task Status", (data?.options?.statuses || []).map((value) => ({ value, label: value }))],
@@ -390,6 +498,9 @@ export default function TeamPerformancePage() {
     ["client_id", "Client", options(data?.options?.clients, "id", "full_name")],
     ["assigned_by", "Assigned By", options(data?.options?.assigners)],
   ], [data]);
+  const usageControlGridClass = usagePeriod === "weekly"
+    ? "grid w-full gap-3 md:grid-cols-2 xl:grid-cols-[175px_175px_175px_165px]"
+    : "grid w-full gap-3 md:grid-cols-[175px_210px_165px]";
 
   if (loading && !data) return <BrandLoader label="Loading team performance" />;
 
@@ -397,7 +508,100 @@ export default function TeamPerformancePage() {
     <div className="space-y-6 p-4 sm:p-6">
       <PageHeader eyebrow="Admin analytics" title="Operations Team Performance" description="Assigned-task workload, completion quality, ageing, and delivery trends." icon={UsersRound} actions={<button type="button" onClick={exportCsv} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"><Download size={16} /> Export CSV</button>} />
 
-      <section className="glass-card p-4">
+      <section className="relative z-30 overflow-visible rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm dark:border-slate-700 dark:bg-none dark:bg-slate-900">
+        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3 2xl:max-w-[360px] 2xl:shrink">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
+                <FileChartColumn size={19} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="break-words text-base font-bold text-slate-950 dark:text-slate-50">Daily & Weekly Usage PDF</h2>
+              <p className="mt-1 max-w-full break-words text-sm leading-5 text-slate-600 dark:text-slate-300">
+                Download CRM user activity, task work, and module usage as PDF.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-100 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/80 2xl:w-auto">
+            <div className={usageControlGridClass}>
+              <label className="space-y-1.5">
+                <span className="ml-1 text-xs font-semibold text-gray-700 dark:text-slate-200">Report Type</span>
+                <div className="grid min-h-10 grid-cols-2 gap-1 rounded-lg border border-blue-100 bg-slate-50 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  {[
+                    ["daily", "Daily"],
+                    ["weekly", "Weekly"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setUsagePeriod(value);
+                        if (value === "weekly") {
+                          const range = weekRangeFor(usageDate || todayKey());
+                          setUsageFromDate((current) => current || range.start);
+                          setUsageToDate((current) => current || range.end);
+                        }
+                      }}
+                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                        usagePeriod === value
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </label>
+
+              {usagePeriod === "weekly" ? (
+                <>
+                  <FormInput
+                    label="From Date"
+                    name="usage_from_date"
+                    type="date"
+                    value={usageFromDate}
+                    onValueChange={setUsageFromDate}
+                    maxDate={maxUsageDate}
+                    inputClassName="min-h-10 rounded-lg border-blue-100 bg-white py-2 shadow-sm dark:border-slate-700 dark:bg-slate-950"
+                  />
+                  <FormInput
+                    label="To Date"
+                    name="usage_to_date"
+                    type="date"
+                    value={usageToDate}
+                    onValueChange={setUsageToDate}
+                    maxDate={maxUsageDate}
+                    inputClassName="min-h-10 rounded-lg border-blue-100 bg-white py-2 shadow-sm dark:border-slate-700 dark:bg-slate-950"
+                  />
+                </>
+              ) : (
+                <FormInput
+                  label="Report Date"
+                  name="usage_report_date"
+                  type="date"
+                  value={usageDate}
+                  onValueChange={setUsageDate}
+                  maxDate={maxUsageDate}
+                  inputClassName="min-h-10 rounded-lg border-blue-100 bg-white py-2 shadow-sm dark:border-slate-700 dark:bg-slate-950"
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={downloadUsageReport}
+                disabled={usageDownloading}
+                className="inline-flex h-10 items-center justify-center gap-2 self-end rounded-lg bg-emerald-600 px-3 mb-1 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={17} />
+                {usageDownloading ? "Preparing..." : "Download PDF"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="glass-card relative z-0 p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {filterSelects.map(([name, label, selectOptions]) => <FormSelect key={name} label={label} name={name} options={selectOptions} value={filters[name]} onValueChange={(value) => setFilter(name, value)} includeAll allLabel={`All ${label}`} />)}
         </div>

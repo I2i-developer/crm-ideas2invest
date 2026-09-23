@@ -232,7 +232,7 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
   };
 
   const voiceInput = useVoiceInput({
-    language: "hi-IN",
+    language: "en-IN",
     onResult: applyVoiceTranscript,
     continuous: true,
     restartOnSilence: true,
@@ -294,7 +294,7 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
           <div>
             <h3 className={styles.voiceTitle}>Voice Task Creation</h3>
             <p className={styles.voiceHint}>
-              Speak naturally in English or Hinglish. Longer dictation is captured continuously, then review before saving.
+              Speak naturally in English or Hinglish. Dictation is written in English text and captured continuously, then review before saving.
             </p>
           </div>
           <div className={styles.voiceControls}>

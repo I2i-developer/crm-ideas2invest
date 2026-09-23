@@ -118,6 +118,7 @@ function TemporalInput({
   required,
   disabled,
   controlClass,
+  maxDate,
 }) {
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -126,6 +127,11 @@ function TemporalInput({
     [type, value]
   );
   const selectedTime = useMemo(() => parseTimeValue(value), [value]);
+  const maxDateKey = useMemo(() => {
+    if (!maxDate || !["date", "datetime-local"].includes(type)) return "";
+    const parsed = parseDateValue(maxDate);
+    return parsed ? dateKey(parsed) : "";
+  }, [maxDate, type]);
   const initialViewDate = selectedDate || new Date();
   const [viewYear, setViewYear] = useState(initialViewDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(initialViewDate.getMonth());
@@ -179,12 +185,14 @@ function TemporalInput({
 
   function moveMonth(direction) {
     const next = new Date(viewYear, viewMonth + direction, 1);
+    if (direction > 0 && maxDateKey && dateKey(next) > maxDateKey) return;
     setViewYear(next.getFullYear());
     setViewMonth(next.getMonth());
   }
 
   function selectDate(date) {
     const nextDate = dateKey(date);
+    if (maxDateKey && nextDate > maxDateKey) return;
     if (type === "datetime-local") {
       const time = selectedTime ? `${pad(selectedTime.hour)}:${pad(selectedTime.minute)}` : "09:00";
       emit(`${nextDate}T${time}`);
@@ -230,6 +238,8 @@ function TemporalInput({
   }
 
   const pickerIcon = type === "time" ? <Clock3 size={18} /> : <CalendarDays size={18} />;
+  const nextMonth = new Date(viewYear, viewMonth + 1, 1);
+  const nextMonthDisabled = Boolean(maxDateKey && dateKey(nextMonth) > maxDateKey);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -264,7 +274,7 @@ function TemporalInput({
       <input type="hidden" name={name} value={value || ""} required={required} readOnly />
 
       {open && !disabled && (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/12 dark:border-slate-700 dark:bg-slate-950 dark:shadow-black/40">
+        <div className="absolute left-0 top-[calc(100%+8px)] z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/12 dark:border-slate-700 dark:bg-slate-950 dark:shadow-black/40">
           {(type === "date" || type === "datetime-local") && (
             <div className="p-3">
               <div className="mb-3 flex items-center justify-between">
@@ -284,7 +294,8 @@ function TemporalInput({
                 <button
                   type="button"
                   onClick={() => moveMonth(1)}
-                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  disabled={nextMonthDisabled}
+                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-35 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                   aria-label="Next month"
                 >
                   <ChevronRight size={18} />
@@ -300,6 +311,10 @@ function TemporalInput({
               <div className="mt-2 grid grid-cols-7 gap-1">
                 {calendarDays.map((date) => {
                   const key = dateKey(date);
+                  const isFutureBlocked = maxDateKey && key > maxDateKey;
+                  if (isFutureBlocked) {
+                    return <span key={key} className="h-9 rounded-xl" aria-hidden="true" />;
+                  }
                   const isSelected = selectedDate && key === dateKey(selectedDate);
                   const isMuted = date.getMonth() !== viewMonth;
                   const isToday = key === todayKey;
@@ -453,6 +468,7 @@ export default function FormInput({
   voiceMode = "replace",
   onVoiceTranscript,
   disabled = false,
+  maxDate,
   multiline = false,
   rows = 3,
   className = "",
@@ -534,6 +550,7 @@ export default function FormInput({
             onFocus={onFocus}
             required={required}
             disabled={disabled}
+            maxDate={maxDate}
             controlClass={controlClass}
           />
         ) : multiline ? (
