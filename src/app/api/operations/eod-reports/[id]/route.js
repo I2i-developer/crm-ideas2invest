@@ -74,8 +74,8 @@ export async function PATCH(request, { params }) {
   } else {
     if (existing.created_by !== user.id) return NextResponse.json({ error: "You can update only your own EOD report" }, { status: 403 });
     payload = operationPayload(body, user.id, existing);
-    if (!payload.work_summary || !payload.completed_work) {
-      return NextResponse.json({ error: "Work summary and completed work are required" }, { status: 400 });
+    if (!payload.completed_work) {
+      return NextResponse.json({ error: "Completed work is required" }, { status: 400 });
     }
     action = "operation_eod_report_updated";
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CheckCircle2, ClipboardCheck, Edit3, Save, SendHorizontal, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Edit3, Save, SendHorizontal, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
@@ -18,7 +18,6 @@ const emptyForm = {
   blockers: "",
   tomorrow_plan: "",
   client_followups: "",
-  documents_processed: 0,
   tasks_completed: 0,
   tasks_pending: 0,
   status: "Submitted",
@@ -62,6 +61,7 @@ export default function OperationsEodReportPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState("");
+  const [editOverlayOpen, setEditOverlayOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [filters, setFilters] = useState({ status: "", date_from: "", date_to: "", search: "" });
@@ -84,7 +84,6 @@ export default function OperationsEodReportPage() {
         initializedFormRef.current = true;
         const todayReport = (data.reports || []).find((report) => report.report_date === data.today);
         if (todayReport) {
-          setEditingId(todayReport.id);
           setForm({
             report_date: todayReport.report_date || data.today,
             work_summary: todayReport.work_summary || "",
@@ -93,7 +92,6 @@ export default function OperationsEodReportPage() {
             blockers: todayReport.blockers || "",
             tomorrow_plan: todayReport.tomorrow_plan || "",
             client_followups: todayReport.client_followups || "",
-            documents_processed: numberValue(todayReport.documents_processed),
             tasks_completed: numberValue(todayReport.tasks_completed),
             tasks_pending: numberValue(todayReport.tasks_pending),
             status: todayReport.status === "Draft" ? "Draft" : "Submitted",
@@ -119,10 +117,11 @@ export default function OperationsEodReportPage() {
 
   function resetForm() {
     setEditingId("");
+    setEditOverlayOpen(false);
     setForm({ ...emptyForm, report_date: today || new Date().toISOString().slice(0, 10) });
   }
 
-  function editReport(report, scroll = true) {
+  function editReport(report) {
     setEditingId(report.id);
     setForm({
       report_date: report.report_date || today,
@@ -132,22 +131,21 @@ export default function OperationsEodReportPage() {
       blockers: report.blockers || "",
       tomorrow_plan: report.tomorrow_plan || "",
       client_followups: report.client_followups || "",
-      documents_processed: numberValue(report.documents_processed),
       tasks_completed: numberValue(report.tasks_completed),
       tasks_pending: numberValue(report.tasks_pending),
       status: report.status === "Draft" ? "Draft" : "Submitted",
     });
-    if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+    setEditOverlayOpen(true);
   }
 
   async function submitReport(event, statusOverride = null) {
     event.preventDefault();
     setSaving(true);
+    const isEditing = Boolean(editingId);
     try {
       const payload = {
         ...form,
         status: statusOverride || form.status || "Submitted",
-        documents_processed: numberValue(form.documents_processed),
         tasks_completed: numberValue(form.tasks_completed),
         tasks_pending: numberValue(form.tasks_pending),
       };
@@ -159,7 +157,7 @@ export default function OperationsEodReportPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save EOD report");
       toast.success(payload.status === "Draft" ? "EOD draft saved" : "EOD report submitted");
-      setEditingId(data.report?.id || "");
+      if (isEditing) resetForm();
       await loadReports();
     } catch (error) {
       toast.error(error.message);
@@ -214,26 +212,20 @@ export default function OperationsEodReportPage() {
       <form onSubmit={submitReport} className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/60 to-emerald-50/50 p-4 shadow-sm sm:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">{editingId ? "Update EOD report" : "Create EOD report"}</h2>
+            <h2 className="text-lg font-bold text-slate-950">Create EOD report</h2>
             <p className="text-sm text-slate-600">One EOD report is maintained per date. Saving the same date updates the existing report.</p>
           </div>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              <Edit3 size={15} /> New date
-            </button>
-          )}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <FormInput label="Report Date" name="report_date" type="date" required maxDate={today} value={form.report_date} onValueChange={(value) => setField("report_date", value)} />
-          <FormInput label="Documents Processed" name="documents_processed" type="number" value={form.documents_processed} onValueChange={(value) => setField("documents_processed", value)} />
           <FormInput label="Tasks Completed" name="tasks_completed" type="number" value={form.tasks_completed} onValueChange={(value) => setField("tasks_completed", value)} />
           <FormInput label="Tasks Pending" name="tasks_pending" type="number" value={form.tasks_pending} onValueChange={(value) => setField("tasks_pending", value)} />
-          <div className="lg:col-span-2">
+          <div>
             <FormSelect label="Save Status" name="status" options={["Submitted", "Draft"]} value={form.status} onValueChange={(value) => setField("status", value)} />
           </div>
           <div className="lg:col-span-3">
-            <FormInput label="Overall Work Summary" name="work_summary" required multiline rows={3} value={form.work_summary} onValueChange={(value) => setField("work_summary", value)} />
+            <FormInput label="Overall Work Summary" name="work_summary" multiline rows={3} value={form.work_summary} onValueChange={(value) => setField("work_summary", value)} />
           </div>
           <div className="lg:col-span-3">
             <FormInput label="Completed Work (one item per line)" name="completed_work" required multiline rows={4} value={form.completed_work} onValueChange={(value) => setField("completed_work", value)} />
@@ -261,8 +253,8 @@ export default function OperationsEodReportPage() {
           <div className="grid gap-3 md:grid-cols-4">
             <FormInput name="search" placeholder="Search reports" value={filters.search} onValueChange={(value) => setFilters((current) => ({ ...current, search: value }))} />
             <FormSelect name="status_filter" value={filters.status} onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))} includeAll allLabel="All status" options={["Draft", "Submitted", "Reviewed"]} />
-            <FormInput name="date_from" type="date" value={filters.date_from} onValueChange={(value) => setFilters((current) => ({ ...current, date_from: value }))} />
-            <FormInput name="date_to" type="date" value={filters.date_to} onValueChange={(value) => setFilters((current) => ({ ...current, date_to: value }))} />
+            <FormInput name="date_from" type="date" placeholder="From date" value={filters.date_from} onValueChange={(value) => setFilters((current) => ({ ...current, date_from: value }))} />
+            <FormInput name="date_to" type="date" placeholder="To date" value={filters.date_to} onValueChange={(value) => setFilters((current) => ({ ...current, date_to: value }))} />
           </div>
         </div>
 
@@ -317,6 +309,55 @@ export default function OperationsEodReportPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={deleteReport}
       />
+
+      {editOverlayOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 px-3 py-6 backdrop-blur-sm">
+          <form onSubmit={submitReport} className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Edit EOD report</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">{formatDateDDMonYYYY(form.report_date)}</h2>
+              </div>
+              <button type="button" onClick={resetForm} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100" aria-label="Close edit EOD report">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[calc(92vh-88px)] overflow-y-auto p-4 sm:p-5">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <FormInput label="Report Date" name="edit_report_date" type="date" required maxDate={today} value={form.report_date} onValueChange={(value) => setField("report_date", value)} />
+                <FormInput label="Tasks Completed" name="edit_tasks_completed" type="number" value={form.tasks_completed} onValueChange={(value) => setField("tasks_completed", value)} />
+                <FormInput label="Tasks Pending" name="edit_tasks_pending" type="number" value={form.tasks_pending} onValueChange={(value) => setField("tasks_pending", value)} />
+                <div className="lg:col-span-3">
+                  <FormSelect label="Save Status" name="edit_status" options={["Submitted", "Draft"]} value={form.status} onValueChange={(value) => setField("status", value)} />
+                </div>
+                <div className="lg:col-span-3">
+                  <FormInput label="Overall Work Summary" name="edit_work_summary" multiline rows={3} value={form.work_summary} onValueChange={(value) => setField("work_summary", value)} />
+                </div>
+                <div className="lg:col-span-3">
+                  <FormInput label="Completed Work (one item per line)" name="edit_completed_work" required multiline rows={4} value={form.completed_work} onValueChange={(value) => setField("completed_work", value)} />
+                </div>
+                <FormInput label="Pending Work" name="edit_pending_work" multiline rows={3} value={form.pending_work} onValueChange={(value) => setField("pending_work", value)} />
+                <FormInput label="Blockers / Support Needed" name="edit_blockers" multiline rows={3} value={form.blockers} onValueChange={(value) => setField("blockers", value)} />
+                <FormInput label="Tomorrow's Plan" name="edit_tomorrow_plan" multiline rows={3} value={form.tomorrow_plan} onValueChange={(value) => setField("tomorrow_plan", value)} />
+                <div className="lg:col-span-3">
+                  <FormInput label="Client Follow-ups / Important Notes" name="edit_client_followups" multiline rows={3} value={form.client_followups} onValueChange={(value) => setField("client_followups", value)} />
+                </div>
+              </div>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={resetForm} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">
+                  Cancel
+                </button>
+                <button type="button" disabled={saving} onClick={(event) => submitReport(event, "Draft")} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">
+                  <Save size={16} /> Save Draft
+                </button>
+                <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60">
+                  <SendHorizontal size={16} /> {saving ? "Saving..." : "Update EOD"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

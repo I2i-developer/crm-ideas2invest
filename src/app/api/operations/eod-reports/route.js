@@ -173,8 +173,8 @@ export async function POST(request) {
   if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
 
   const payload = reportPayload({ ...body, report_date: reportDate }, user.id, existing || {});
-  if (!payload.work_summary || !payload.completed_work) {
-    return NextResponse.json({ error: "Work summary and completed work are required" }, { status: 400 });
+  if (!payload.completed_work) {
+    return NextResponse.json({ error: "Completed work is required" }, { status: 400 });
   }
 
   const mutation = existing

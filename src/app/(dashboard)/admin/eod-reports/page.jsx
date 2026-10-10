@@ -45,6 +45,63 @@ function NumberedText({ text, className = "" }) {
   );
 }
 
+const USER_TONES = [
+  {
+    badge: "border-sky-200 bg-sky-50 text-sky-800 shadow-sky-100",
+    avatar: "bg-sky-600 text-white",
+  },
+  {
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100",
+    avatar: "bg-emerald-600 text-white",
+  },
+  {
+    badge: "border-amber-200 bg-amber-50 text-amber-800 shadow-amber-100",
+    avatar: "bg-amber-500 text-white",
+  },
+  {
+    badge: "border-violet-200 bg-violet-50 text-violet-800 shadow-violet-100",
+    avatar: "bg-violet-600 text-white",
+  },
+  {
+    badge: "border-rose-200 bg-rose-50 text-rose-800 shadow-rose-100",
+    avatar: "bg-rose-600 text-white",
+  },
+  {
+    badge: "border-teal-200 bg-teal-50 text-teal-800 shadow-teal-100",
+    avatar: "bg-teal-600 text-white",
+  },
+  {
+    badge: "border-indigo-200 bg-indigo-50 text-indigo-800 shadow-indigo-100",
+    avatar: "bg-indigo-600 text-white",
+  },
+  {
+    badge: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 shadow-fuchsia-100",
+    avatar: "bg-fuchsia-600 text-white",
+  },
+];
+
+function colorIndex(value) {
+  const source = String(value || "Operations user");
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = (hash * 31 + source.charCodeAt(index)) % 9973;
+  }
+  return hash % USER_TONES.length;
+}
+
+function SubmitterBadge({ profile, toneIndex = null }) {
+  const name = profile?.name || "Operations user";
+  const tone = USER_TONES[toneIndex ?? colorIndex(profile?.id || profile?.email || name)];
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-extrabold shadow-sm ${tone.badge}`}>
+      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black uppercase ${tone.avatar}`}>
+        {name.slice(0, 1)}
+      </span>
+      <span className="max-w-[180px] truncate">{name}</span>
+    </span>
+  );
+}
+
 export default function AdminEodReportsPage() {
   const [reports, setReports] = useState([]);
   const [summary, setSummary] = useState({});
@@ -133,6 +190,14 @@ export default function AdminEodReportsPage() {
     ["Today submitted", summary.today_submitted || 0, "bg-amber-50 text-amber-700"],
   ], [summary]);
 
+  const userToneById = useMemo(() => {
+    const tones = new Map();
+    users.forEach((user, index) => {
+      tones.set(user.id, index % USER_TONES.length);
+    });
+    return tones;
+  }, [users]);
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -178,8 +243,8 @@ export default function AdminEodReportsPage() {
             allLabel="All status"
             options={["Draft", "Submitted", "Reviewed"]}
           />
-          <FormInput name="date_from" type="date" value={filters.date_from} onValueChange={(value) => setFilters((current) => ({ ...current, date_from: value }))} />
-          <FormInput name="date_to" type="date" value={filters.date_to} onValueChange={(value) => setFilters((current) => ({ ...current, date_to: value }))} />
+          <FormInput name="date_from" type="date" placeholder="From date" value={filters.date_from} onValueChange={(value) => setFilters((current) => ({ ...current, date_from: value }))} />
+          <FormInput name="date_to" type="date" placeholder="To date" value={filters.date_to} onValueChange={(value) => setFilters((current) => ({ ...current, date_to: value }))} />
         </div>
       </section>
 
@@ -190,17 +255,11 @@ export default function AdminEodReportsPage() {
           <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">No EOD reports found.</p>
         ) : reports.map((report) => {
           const reviewing = reviewingId === report.id;
+          const toneIndex = userToneById.get(report.created_by);
           const metricCards = [
-            ["Documents", report.documents_processed],
             ["Tasks Done", report.tasks_completed],
             ["Tasks Pending", report.tasks_pending],
           ].filter(([, value]) => positiveCount(value));
-          const details = [
-            ["Pending Work", report.pending_work],
-            ["Blockers / Support Needed", report.blockers],
-            ["Tomorrow's Plan", report.tomorrow_plan],
-            ["Client Follow-ups", report.client_followups],
-          ].filter(([, value]) => hasText(value));
           return (
             <article key={report.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -208,7 +267,7 @@ export default function AdminEodReportsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass(report.status)}`}>{report.status}</span>
                     <span className="text-sm font-bold text-slate-900">{formatDateDDMonYYYY(report.report_date)}</span>
-                    <span className="text-sm text-slate-500">by {report.created_by_profile?.name || "Operations user"}</span>
+                    <SubmitterBadge profile={report.created_by_profile} toneIndex={toneIndex} />
                     {report.submitted_at && <span className="text-xs text-slate-500">Submitted {formatDateTimeDDMonYYYY(report.submitted_at)}</span>}
                   </div>
                   <h2 className="mt-3 text-base font-bold text-slate-950">{report.work_summary || "EOD report"}</h2>
@@ -259,7 +318,7 @@ export default function AdminEodReportsPage() {
         })}
       </section>
 
-      <EodViewOverlay report={viewReport} onClose={() => setViewReport(null)} />
+      <EodViewOverlay report={viewReport} toneIndex={userToneById.get(viewReport?.created_by)} onClose={() => setViewReport(null)} />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
@@ -274,11 +333,10 @@ export default function AdminEodReportsPage() {
   );
 }
 
-function EodViewOverlay({ report, onClose }) {
+function EodViewOverlay({ report, toneIndex, onClose }) {
   if (!report) return null;
 
   const metricCards = [
-    ["Documents", report.documents_processed],
     ["Tasks Done", report.tasks_completed],
     ["Tasks Pending", report.tasks_pending],
   ].filter(([, value]) => positiveCount(value));
@@ -297,7 +355,7 @@ function EodViewOverlay({ report, onClose }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass(report.status)}`}>{report.status}</span>
               <span className="text-sm font-bold text-slate-900">{formatDateDDMonYYYY(report.report_date)}</span>
-              <span className="text-sm text-slate-500">by {report.created_by_profile?.name || "Operations user"}</span>
+              <SubmitterBadge profile={report.created_by_profile} toneIndex={toneIndex} />
             </div>
             <h2 className="mt-3 text-lg font-bold text-slate-950">{report.work_summary || "EOD report"}</h2>
             {report.submitted_at && <p className="mt-1 text-xs text-slate-500">Submitted {formatDateTimeDDMonYYYY(report.submitted_at)}</p>}
