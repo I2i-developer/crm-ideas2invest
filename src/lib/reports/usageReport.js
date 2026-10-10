@@ -6,6 +6,28 @@ import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 const CRM_TIME_ZONE = "Asia/Kolkata";
 const IST_OFFSET = "+05:30";
 const ROLE_ORDER = { admin: 0, operations: 1 };
+const MODULE_BREAKDOWN_KEYS = [
+  "clients",
+  "documents",
+  "kyc",
+  "sip",
+  "tasks",
+  "self_work",
+  "eod_reports",
+  "meetings",
+  "reminders",
+  "birthdays",
+  "chat",
+  "notes",
+  "insurance",
+  "risk",
+  "forms",
+  "company",
+  "calculators",
+  "alerts",
+  "user_access",
+  "audit",
+];
 
 function normalized(value) {
   return String(value || "").trim().toLowerCase();
@@ -41,6 +63,13 @@ function addDays(date, days) {
 
 function formatDateKey(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function dateKeyFromTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return toDateKey(date);
 }
 
 export function getUsageReportRange({ period = "daily", date, dateFrom, dateTo } = {}) {
@@ -111,19 +140,26 @@ function touchLastActivity(map, key, timestamp) {
 function moduleFromAudit(log) {
   const source = `${log.entity_type || ""} ${log.action || ""}`.toLowerCase();
   if (source.includes("document") || source.includes("parse")) return "documents";
-  if (source.includes("task")) return "tasks";
   if (source.includes("sip")) return "sip";
   if (source.includes("kyc")) return "kyc";
-  if (source.includes("meeting")) return "meetings";
-  if (source.includes("reminder")) return "reminders";
-  if (source.includes("chat")) return "chat";
-  if (source.includes("client")) return "clients";
   if (source.includes("insurance")) return "insurance";
   if (source.includes("risk")) return "risk";
   if (source.includes("calculator")) return "calculators";
   if (source.includes("company") || source.includes("credential")) return "company";
   if (source.includes("form")) return "forms";
-  return "other";
+  if (source.includes("web_push") || source.includes("notification") || source.includes("alert")) return "alerts";
+  if (source.includes("eod_report") || source.includes("end_of_day")) return "eod_reports";
+  if (source.includes("operation_self_task") || source.includes("self_task")) return "self_work";
+  if (source.includes("reminder")) return "reminders";
+  if (source.includes("birthday")) return "birthdays";
+  if (source.includes("meeting")) return "meetings";
+  if (source.includes("chat")) return "chat";
+  if (source.includes("operation_note") || source.includes("note")) return "notes";
+  if (source.includes("task")) return "tasks";
+  if (source.includes("client")) return "clients";
+  if (source.includes("user") || source.includes("provisioning") || source.includes("password")) return "user_access";
+  if (source.includes("audit")) return "audit";
+  return "audit";
 }
 
 function activityLabel(activity) {
@@ -140,6 +176,14 @@ async function runQuery(query, fallback = []) {
   return data || fallback;
 }
 
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Number(seconds || 0));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours <= 0) return `${minutes}m`;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+}
+
 export async function buildUsageReportData(supabase, range) {
   const [
     profiles,
@@ -149,6 +193,8 @@ export async function buildUsageReportData(supabase, range) {
     taskComments,
     taskAssignments,
     selfTasks,
+    usageDaily,
+    usageSessions,
   ] = await Promise.all([
     runQuery(
       supabase
@@ -201,6 +247,22 @@ export async function buildUsageReportData(supabase, range) {
         .or(`created_at.gte.${range.startIso},updated_at.gte.${range.startIso},completed_at.gte.${range.startIso}`)
         .order("created_at", { ascending: false })
     ),
+    runQuery(
+      supabase
+        .from("crm_user_usage_daily")
+        .select("id, user_id, usage_date, active_seconds, heartbeat_count, page_views, session_count, first_seen_at, last_seen_at")
+        .gte("usage_date", range.startKey)
+        .lte("usage_date", range.inclusiveEndKey)
+        .order("usage_date", { ascending: true })
+    ),
+    runQuery(
+      supabase
+        .from("crm_usage_sessions")
+        .select("id, user_id, started_at, last_seen_at, active_seconds, heartbeat_count, page_views")
+        .gte("last_seen_at", range.startIso)
+        .lt("last_seen_at", range.endIso)
+        .order("last_seen_at", { ascending: true })
+    ),
   ]);
 
   const users = (profiles || [])
@@ -231,14 +293,25 @@ export async function buildUsageReportData(supabase, range) {
     sip: 0,
     meetings: 0,
     reminders: 0,
+    birthdays: 0,
     chat: 0,
+    notes: 0,
     insurance: 0,
     risk: 0,
     forms: 0,
     company: 0,
     calculators: 0,
+    self_work: 0,
+    eod_reports: 0,
+    alerts: 0,
+    user_access: 0,
+    audit: 0,
+    active_seconds: 0,
+    session_count: 0,
+    page_views: 0,
+    heartbeat_count: 0,
+    first_seen_at: null,
     permission_denied: 0,
-    other: 0,
     last_activity: null,
     recent_activity: [],
   }]));
@@ -246,6 +319,104 @@ export async function buildUsageReportData(supabase, range) {
   const auditEmailMap = new Map(users.filter((user) => user.email).map((user) => [normalized(user.email), user.id]));
   const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
   const detailedActivity = [];
+  const usageByUserDate = new Map();
+
+  function mergeUsageRow(row, source = "daily") {
+    if (!row?.user_id || !userMap.has(row.user_id)) return;
+    const usageDate = row.usage_date || dateKeyFromTimestamp(row.last_seen_at || row.started_at);
+    if (!usageDate) return;
+    const key = `${row.user_id}:${usageDate}`;
+    const existing = usageByUserDate.get(key) || {
+      user_id: row.user_id,
+      usage_date: usageDate,
+      active_seconds: 0,
+      heartbeat_count: 0,
+      page_views: 0,
+      session_count: 0,
+      first_seen_at: null,
+      last_seen_at: null,
+    };
+    const activeSeconds = Number(row.active_seconds || 0);
+    const heartbeatCount = Number(row.heartbeat_count || 0);
+    const pageViews = Number(row.page_views || 0);
+    const sessionCount = Number(row.session_count || 0);
+
+    if (source === "daily") {
+      existing.active_seconds = Math.max(existing.active_seconds, activeSeconds);
+      existing.heartbeat_count = Math.max(existing.heartbeat_count, heartbeatCount);
+      existing.page_views = Math.max(existing.page_views, pageViews);
+      existing.session_count = Math.max(existing.session_count, sessionCount);
+    } else if (!existing.active_seconds || activeSeconds > existing.active_seconds) {
+      existing.active_seconds = activeSeconds;
+      existing.heartbeat_count = heartbeatCount;
+      existing.page_views = pageViews;
+      existing.session_count = Math.max(existing.session_count, 1);
+    }
+
+    const firstSeen = row.first_seen_at || row.started_at;
+    const lastSeen = row.last_seen_at;
+    if (firstSeen && (!existing.first_seen_at || new Date(firstSeen) < new Date(existing.first_seen_at))) {
+      existing.first_seen_at = firstSeen;
+    }
+    if (lastSeen && (!existing.last_seen_at || new Date(lastSeen) > new Date(existing.last_seen_at))) {
+      existing.last_seen_at = lastSeen;
+    }
+    usageByUserDate.set(key, existing);
+  }
+
+  for (const usage of usageDaily || []) mergeUsageRow(usage, "daily");
+
+  const sessionsByUserDate = new Map();
+  for (const session of usageSessions || []) {
+    if (!session?.user_id || !userMap.has(session.user_id)) continue;
+    const usageDate = dateKeyFromTimestamp(session.last_seen_at || session.started_at);
+    if (!usageDate) continue;
+    const key = `${session.user_id}:${usageDate}`;
+    const existing = sessionsByUserDate.get(key) || {
+      user_id: session.user_id,
+      usage_date: usageDate,
+      active_seconds: 0,
+      heartbeat_count: 0,
+      page_views: 0,
+      session_count: 0,
+      first_seen_at: null,
+      last_seen_at: null,
+    };
+    existing.active_seconds += Number(session.active_seconds || 0);
+    existing.heartbeat_count += Number(session.heartbeat_count || 0);
+    existing.page_views += Number(session.page_views || 0);
+    existing.session_count += 1;
+    if (session.started_at && (!existing.first_seen_at || new Date(session.started_at) < new Date(existing.first_seen_at))) {
+      existing.first_seen_at = session.started_at;
+    }
+    if (session.last_seen_at && (!existing.last_seen_at || new Date(session.last_seen_at) > new Date(existing.last_seen_at))) {
+      existing.last_seen_at = session.last_seen_at;
+    }
+    sessionsByUserDate.set(key, existing);
+  }
+
+  for (const sessionUsage of sessionsByUserDate.values()) mergeUsageRow(sessionUsage, "sessions");
+
+  const usageRows = [...usageByUserDate.values()].sort((a, b) => {
+    const dateDiff = String(a.usage_date).localeCompare(String(b.usage_date));
+    if (dateDiff) return dateDiff;
+    const aName = userMap.get(a.user_id)?.user?.name || "";
+    const bName = userMap.get(b.user_id)?.user?.name || "";
+    return aName.localeCompare(bName, "en", { sensitivity: "base" });
+  });
+
+  for (const usage of usageRows) {
+    if (!usage.user_id || !userMap.has(usage.user_id)) continue;
+    const row = userMap.get(usage.user_id);
+    row.active_seconds += Number(usage.active_seconds || 0);
+    row.session_count += Number(usage.session_count || 0);
+    row.page_views += Number(usage.page_views || 0);
+    row.heartbeat_count += Number(usage.heartbeat_count || 0);
+    if (usage.first_seen_at && (!row.first_seen_at || new Date(usage.first_seen_at) < new Date(row.first_seen_at))) {
+      row.first_seen_at = usage.first_seen_at;
+    }
+    if (usage.last_seen_at) touchLastActivity(userMap, usage.user_id, usage.last_seen_at);
+  }
 
   for (const log of auditLogs || []) {
     const actorId = log.actor_id || auditEmailMap.get(normalized(log.actor_email));
@@ -317,6 +488,7 @@ export async function buildUsageReportData(supabase, range) {
     if (!actorId || !userMap.has(actorId)) continue;
     if (createdInRange || updatedInRange || completedInRange) {
       increment(userMap, actorId, "self_tasks");
+      increment(userMap, actorId, "self_work", 1, false);
       touchLastActivity(userMap, actorId, selfTask.updated_at || selfTask.created_at);
       detailedActivity.push({
         user_id: actorId,
@@ -336,18 +508,38 @@ export async function buildUsageReportData(supabase, range) {
   }
 
   const userRows = [...userMap.values()];
-  const activeUsers = userRows.filter((row) => row.total_actions > 0).length;
+  const activeUsers = userRows.filter((row) => row.total_actions > 0 || row.active_seconds > 0).length;
+  const dailyUsage = usageRows
+    .filter((usage) => usage.user_id && userMap.has(usage.user_id))
+    .map((usage) => {
+      const row = userMap.get(usage.user_id);
+      return {
+        user_id: usage.user_id,
+        user_name: row.user.name,
+        role: row.user.role,
+        usage_date: usage.usage_date,
+        active_seconds: Number(usage.active_seconds || 0),
+        session_count: Number(usage.session_count || 0),
+        page_views: Number(usage.page_views || 0),
+        first_seen_at: usage.first_seen_at,
+        last_seen_at: usage.last_seen_at,
+      };
+    });
 
   return {
     range,
     generatedAt: new Date().toISOString(),
     users: userRows,
+    daily_usage: dailyUsage,
     activity: detailedActivity.sort((a, b) => new Date(b.time) - new Date(a.time)),
     summary: {
       total_users: userRows.length,
       active_users: activeUsers,
       inactive_users: userRows.length - activeUsers,
       total_actions: userRows.reduce((sum, row) => sum + row.total_actions, 0),
+      active_seconds: userRows.reduce((sum, row) => sum + row.active_seconds, 0),
+      session_count: userRows.reduce((sum, row) => sum + row.session_count, 0),
+      page_views: userRows.reduce((sum, row) => sum + row.page_views, 0),
       audit_events: auditLogs.length,
       task_activity: taskActivities.length,
       tasks_created: userRows.reduce((sum, row) => sum + row.tasks_created, 0),
@@ -359,6 +551,13 @@ export async function buildUsageReportData(supabase, range) {
       meetings: userRows.reduce((sum, row) => sum + row.meetings, 0),
       reminders: userRows.reduce((sum, row) => sum + row.reminders, 0),
       chat: userRows.reduce((sum, row) => sum + row.chat, 0),
+      birthdays: userRows.reduce((sum, row) => sum + row.birthdays, 0),
+      notes: userRows.reduce((sum, row) => sum + row.notes, 0),
+      self_work: userRows.reduce((sum, row) => sum + row.self_work, 0),
+      eod_reports: userRows.reduce((sum, row) => sum + row.eod_reports, 0),
+      alerts: userRows.reduce((sum, row) => sum + row.alerts, 0),
+      user_access: userRows.reduce((sum, row) => sum + row.user_access, 0),
+      audit: userRows.reduce((sum, row) => sum + row.audit, 0),
     },
   };
 }
@@ -415,12 +614,12 @@ function drawSummary(doc, report) {
   const metrics = [
     ["Total Users", report.summary.total_users],
     ["Active Users", report.summary.active_users],
+    ["Active Time", formatDuration(report.summary.active_seconds)],
+    ["Sessions", report.summary.session_count],
     ["Total Actions", report.summary.total_actions],
-    ["Tasks Created", report.summary.tasks_created],
+    ["Page Views", report.summary.page_views],
     ["Tasks Completed", report.summary.tasks_completed],
     ["Remarks", report.summary.task_remarks],
-    ["Documents", report.summary.documents],
-    ["KYC/SIP", report.summary.kyc + report.summary.sip],
   ];
   const gap = 10;
   const width = (doc.page.width - 72 - gap * 3) / 4;
@@ -440,6 +639,8 @@ function drawUserTable(doc, report) {
   const columns = [
     ["User", 112],
     ["Role", 62],
+    ["Active Time", 62],
+    ["Sessions", 44],
     ["Total", 42],
     ["Audit", 42],
     ["Task", 42],
@@ -473,6 +674,8 @@ function drawUserTable(doc, report) {
     row([
       rowData.user.name,
       rowData.user.role,
+      formatDuration(rowData.active_seconds),
+      rowData.session_count,
       rowData.total_actions,
       rowData.audit_events,
       rowData.task_activity,
@@ -494,8 +697,7 @@ function drawModuleBreakdown(doc, report) {
   doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(14).text("Module Breakdown", 36, titleY);
   doc.fillColor("#64748b").font("Helvetica").fontSize(9).text("Module-wise action count from audit and activity logs.", 36, titleY + 18);
   doc.y = titleY + 40;
-  const modules = ["clients", "documents", "kyc", "sip", "meetings", "reminders", "chat", "insurance", "risk", "forms", "company", "calculators", "other"];
-  const totals = modules.map((moduleKey) => [moduleKey, report.users.reduce((sum, row) => sum + (row[moduleKey] || 0), 0)]).filter(([, count]) => count > 0);
+  const totals = MODULE_BREAKDOWN_KEYS.map((moduleKey) => [moduleKey, report.users.reduce((sum, row) => sum + (row[moduleKey] || 0), 0)]).filter(([, count]) => count > 0);
   if (!totals.length) {
     doc.fillColor("#64748b").font("Helvetica").fontSize(10).text("No module-specific actions found for this period.", 36, doc.y);
     return;
@@ -525,38 +727,43 @@ function drawModuleBreakdown(doc, report) {
   doc.y = baseY + Math.ceil(totals.length / 4) * (cardHeight + rowGap) + 8;
 }
 
-function drawActivityLog(doc, report) {
+function drawDailyUsageTable(doc, report) {
   ensureSpace(doc, 100);
   const titleY = doc.y;
-  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(14).text("Detailed Activity Log", 36, titleY);
-  doc.y = titleY + 28;
+  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(14).text("Daily Active Login Sessions", 36, titleY);
+  doc.fillColor("#64748b").font("Helvetica").fontSize(9).text("Day-wise active CRM time counted only while the user is present and active in the browser.", 36, titleY + 18);
+  doc.y = titleY + 42;
 
-  const profileById = new Map(report.users.map((row) => [row.user.id, row.user]));
-  const activities = report.activity.slice(0, 250);
-  if (!activities.length) {
-    doc.fillColor("#64748b").font("Helvetica").fontSize(10).text("No activity found for this period.", 36, doc.y);
+  const rows = report.daily_usage || [];
+  if (!rows.length) {
+    doc.fillColor("#64748b").font("Helvetica").fontSize(10).text("No active login session time found for this period.", 36, doc.y);
     return;
   }
 
   const headerY = doc.y;
   doc.rect(36, headerY, doc.page.width - 72, 19).fill("#f1f5f9");
   doc.fillColor("#475569").font("Helvetica-Bold").fontSize(7.5);
-  doc.text("Time", 40, headerY + 5, { width: 90 });
-  doc.text("User", 136, headerY + 5, { width: 120 });
-  doc.text("Module", 260, headerY + 5, { width: 70 });
-  doc.text("Action", 338, headerY + 5, { width: 125 });
-  doc.text("Detail", 470, headerY + 5, { width: doc.page.width - 506 });
+  doc.text("Date", 40, headerY + 5, { width: 82 });
+  doc.text("User", 128, headerY + 5, { width: 150 });
+  doc.text("Role", 286, headerY + 5, { width: 70 });
+  doc.text("Active Time", 364, headerY + 5, { width: 80 });
+  doc.text("Sessions", 452, headerY + 5, { width: 60 });
+  doc.text("Page Views", 520, headerY + 5, { width: 70 });
+  doc.text("First Seen", 598, headerY + 5, { width: 94 });
+  doc.text("Last Seen", 698, headerY + 5, { width: doc.page.width - 734 });
   doc.y = headerY + 24;
 
-  for (const item of activities) {
+  for (const item of rows) {
     ensureSpace(doc, 30);
-    const user = profileById.get(item.user_id);
     const y = doc.y;
-    doc.fillColor("#64748b").font("Helvetica").fontSize(7.5).text(formatDateTimeDDMonYYYY(item.time), 36, y, { width: 95 });
-    doc.fillColor("#0f172a").font("Helvetica-Bold").text(safeText(user?.name, 26), 136, y, { width: 120 });
-    doc.fillColor("#2563eb").font("Helvetica-Bold").text(activityLabel(item.module), 260, y, { width: 70 });
-    doc.fillColor("#0f172a").font("Helvetica").text(safeText(item.action, 34), 338, y, { width: 125 });
-    doc.fillColor("#475569").text(safeText(item.detail, 70), 470, y, { width: doc.page.width - 506 });
+    doc.fillColor("#64748b").font("Helvetica").fontSize(7.5).text(formatDateDDMonYYYY(item.usage_date), 36, y, { width: 86 });
+    doc.fillColor("#0f172a").font("Helvetica-Bold").text(safeText(item.user_name, 32), 128, y, { width: 150 });
+    doc.fillColor("#2563eb").font("Helvetica-Bold").text(activityLabel(item.role), 286, y, { width: 70 });
+    doc.fillColor("#0f172a").font("Helvetica-Bold").text(formatDuration(item.active_seconds), 364, y, { width: 80 });
+    doc.fillColor("#475569").font("Helvetica").text(String(item.session_count || 0), 452, y, { width: 60 });
+    doc.text(String(item.page_views || 0), 520, y, { width: 70 });
+    doc.text(item.first_seen_at ? formatDateTimeDDMonYYYY(item.first_seen_at) : "-", 598, y, { width: 94 });
+    doc.text(item.last_seen_at ? formatDateTimeDDMonYYYY(item.last_seen_at) : "-", 698, y, { width: doc.page.width - 734 });
     doc.y = y + 18;
     doc.moveTo(36, doc.y - 3).lineTo(doc.page.width - 36, doc.y - 3).strokeColor("#eef2f7").stroke();
   }
@@ -575,7 +782,7 @@ export function renderUsageReportPdf(report) {
     drawSummary(doc, report);
     drawUserTable(doc, report);
     drawModuleBreakdown(doc, report);
-    drawActivityLog(doc, report);
+    drawDailyUsageTable(doc, report);
 
     const pages = doc.bufferedPageRange();
     for (let index = pages.start; index < pages.start + pages.count; index += 1) {

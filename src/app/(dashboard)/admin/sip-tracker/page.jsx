@@ -17,11 +17,6 @@ const REPORT_VISUALS = {
     tone: "border-blue-100 bg-blue-50 text-blue-800",
     iconTone: "bg-blue-600 text-white",
   },
-  kfintech_termination_pause: {
-    icon: PauseCircle,
-    tone: "border-amber-100 bg-amber-50 text-amber-800",
-    iconTone: "bg-amber-500 text-white",
-  },
   kfintech_transaction_rejection: {
     icon: ShieldAlert,
     tone: "border-rose-100 bg-rose-50 text-rose-800",

@@ -462,6 +462,8 @@ export default function TeamPerformancePage() {
     }
 
     setUsageDownloading(true);
+    window.dispatchEvent(new Event("crm:usage-flush"));
+    await new Promise((resolve) => window.setTimeout(resolve, 700));
     const query = new URLSearchParams({ period: usagePeriod });
     if (usagePeriod === "weekly") {
       query.set("date_from", usageFromDate);

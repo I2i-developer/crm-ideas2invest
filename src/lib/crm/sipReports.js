@@ -55,7 +55,6 @@ const FIELD_MAP = {
 const REQUIRED_HEADERS = ["INVNAME", "ACNO"];
 const REPORT_REQUIRED_HEADERS = {
   kfintech_sip_stp: REQUIRED_HEADERS,
-  kfintech_termination_pause: ["INVNAME", "ACNO", "TRTYPE", "STARTDATE", "ENDDATE", "IHNO"],
   kfintech_transaction_rejection: ["NAME", "ACNO", "TRDATE", "REMARKS"],
   kfintech_closed_sip_stp: ["INVNAME", "ACNO", "FROMDATE", "TODATE", "SIPREGDT", "IHNO", "TRTYPE"],
   kfintech_sip_stp_expiring: ["NAME", "ACNO", "ENDDATE", "TRTYPE", "IHNO"],
@@ -308,57 +307,6 @@ function normalizeKfintechTransactionRejectionRow(rawRow, { reportRta, reportTyp
   return normalized;
 }
 
-function normalizeKfintechActiveSipStpRow(rawRow, { reportRta, reportType } = {}) {
-  const transactionType = rawValue(rawRow, ["TrType", "SIPFlag"]) || "SIP/STP";
-  const frequency = rawValue(rawRow, ["Freq", "Frequency"]);
-  const paidInstallments = rawValue(rawRow, ["PAIDINST"]);
-  const pendingInstallments = rawValue(rawRow, ["PENDINST"]);
-  const totalInstallments = rawValue(rawRow, ["INSTALNO"]);
-  const remarks = cleanCamsRemark(rawValue(rawRow, ["REMARKS"]));
-  const offPhone = rawValue(rawRow, ["OffPhone"]);
-  const resPhone = rawValue(rawRow, ["ResPhone"]);
-  const phone = offPhone || resPhone;
-  const stpTarget = [
-    rawValue(rawRow, ["STPInScheme"]),
-    rawValue(rawRow, ["StpInPlan"]),
-    rawValue(rawRow, ["StpInProdCode"]),
-  ].filter(Boolean).join(" / ");
-  const installmentText = [paidInstallments, totalInstallments].filter(Boolean).join("/");
-
-  const normalized = {
-    raw_row: rawRow,
-    report_rta: reportRta || DEFAULT_SIP_REPORT_RTA,
-    report_type: reportType || "kfintech_termination_pause",
-    fund: rawValue(rawRow, ["SchDesc"]) || rawValue(rawRow, ["Fund"]),
-    scheme: rawValue(rawRow, ["SchDesc"]) || rawValue(rawRow, ["SchCode"]),
-    plan: rawValue(rawRow, ["SchCode"]),
-    product_code: rawValue(rawRow, ["Prodcode", "ProdCode"]) || rawValue(rawRow, ["SchCode"]),
-    folio_no: rawValue(rawRow, ["Acno"]),
-    amount: parseAmount(rawValue(rawRow, ["AMOUNT", "Amount"])),
-    start_date: parseReportDate(rawValue(rawRow, ["STARTDATE", "StartDate"])),
-    end_date: parseReportDate(rawValue(rawRow, ["ENDDATE", "EndDate"])),
-    frequency,
-    agent: rawValue(rawRow, ["Agent"]),
-    subbroker: rawValue(rawRow, ["SubBroker", "SubBrok"]),
-    investor_name: rawValue(rawRow, ["InvName", "Name"]),
-    email: normalizeEmail(rawValue(rawRow, ["Email"])),
-    mobile: normalizeMobile(phone),
-    phone: normalizeMobile(phone) || phone,
-    remarks: remarks || `${transactionType} active${installmentText ? `; installments ${installmentText}` : ""}${pendingInstallments ? `; pending ${pendingInstallments}` : ""}${stpTarget ? `; target ${stpTarget}` : ""}`,
-    sip_flag: transactionType,
-    sip_registration_date: parseReportDate(rawValue(rawRow, ["RegDate", "sipregdt", "SIPREGDT"])),
-    ihno: rawValue(rawRow, ["IHNO", "Ihno"]),
-    sip_registration_no: rawValue(rawRow, ["IHNO", "Ihno"]),
-    to_scheme: rawValue(rawRow, ["STPInScheme"]),
-    to_plan: rawValue(rawRow, ["StpInPlan"]),
-    to_product_code: rawValue(rawRow, ["StpInProdCode"]),
-    event_type: "active",
-  };
-
-  normalized.row_fingerprint = stableFingerprint(normalized);
-  return normalized;
-}
-
 function normalizeKfintechSipStpExpiringRow(rawRow, { reportRta, reportType } = {}) {
   const fundCode = rawValue(rawRow, ["Fund"]);
   const schemeCode = rawValue(rawRow, ["Scheme"]);
@@ -522,14 +470,6 @@ function buildRowsFromHeaderMatrix(matrix = [], requiredHeaders = REQUIRED_HEADE
 }
 
 function normalizeRowsForReport(rows, selection) {
-  if (selection.reportType === "kfintech_termination_pause") {
-    const activeRows = rows.map((row) => normalizeKfintechActiveSipStpRow(row, selection));
-    if (!activeRows.length) {
-      throw new Error("No active SIP/STP rows found.");
-    }
-    return activeRows;
-  }
-
   if (selection.reportType === "kfintech_transaction_rejection") {
     const rejectedRows = rows.map((row) => normalizeKfintechTransactionRejectionRow(row, selection));
     if (!rejectedRows.length) {

@@ -40,7 +40,6 @@ const FOLLOW_UP_STATUSES = [
 
 const EVENT_TYPES = [
   ["all", "All event types"],
-  ["active", "Active"],
   ["terminated", "Terminated"],
   ["paused", "Paused"],
   ["rejected", "Rejected"],
@@ -101,13 +100,6 @@ function displayTransactionType(event) {
   return normalizedRawValue(event.raw_row, ["TrType"]) || String(event.sip_flag || "").replace(/^CAMS\s+/i, "") || "-";
 }
 
-function displayInstallments(event) {
-  const paid = normalizedRawValue(event.raw_row, ["PAIDINST"]);
-  const pending = normalizedRawValue(event.raw_row, ["PENDINST"]);
-  if (!paid && !pending) return "-";
-  return `${paid || "0"} / ${pending || "0"}`;
-}
-
 function formatSipDate(value) {
   return formatDateDDMonYYYY(value, "-");
 }
@@ -131,16 +123,6 @@ function displayRemarks(event) {
 }
 
 function DateCell({ event }) {
-  if (event.report_type === "kfintech_termination_pause") {
-    return (
-      <div className="space-y-1 whitespace-nowrap text-xs text-gray-700">
-        <p><span className="font-semibold text-gray-500">Reg:</span> {formatSipDate(event.sip_registration_date)}</p>
-        <p><span className="font-semibold text-gray-500">Start:</span> {formatSipDate(event.start_date)}</p>
-        <p><span className="font-semibold text-gray-500">End:</span> {formatSipDate(event.end_date)}</p>
-      </div>
-    );
-  }
-
   if (event.report_type === "kfintech_closed_sip_stp") {
     return (
       <div className="space-y-1 whitespace-nowrap text-xs text-gray-700">
@@ -193,7 +175,6 @@ function buildSipTaskDescription(event) {
 
 function chipClass(value) {
   const styles = {
-    active: "bg-emerald-100 text-emerald-800 border-emerald-200",
     terminated: "bg-orange-100 text-orange-800 border-orange-200",
     paused: "bg-yellow-100 text-yellow-800 border-yellow-200",
     cancelled: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -227,7 +208,6 @@ function followUpSelectClass(value) {
 
 function rowClass(eventType) {
   const styles = {
-    active: "border-l-4 border-emerald-500 bg-emerald-50/75",
     terminated: "border-l-4 border-blue-500 bg-blue-50/75",
     paused: "border-l-4 border-green-500 bg-green-50/75",
     rejected: "border-l-4 border-cyan-500 bg-cyan-50/75",
@@ -328,10 +308,8 @@ export default function SipReportPage({ reportTypeValue = DEFAULT_SIP_REPORT_TYP
 
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (key === "follow_up_status" && reportType === "kfintech_termination_pause") return;
       if (
         key === "transaction_type" &&
-        reportType !== "kfintech_termination_pause" &&
         reportType !== "kfintech_closed_sip_stp"
       ) return;
       if (value && value !== "all") params.set(key, value);
@@ -544,49 +522,36 @@ export default function SipReportPage({ reportTypeValue = DEFAULT_SIP_REPORT_TYP
   }
 
   const pageSize = 10;
-  const isActiveReport = reportType === "kfintech_termination_pause";
   const isClosedReport = reportType === "kfintech_closed_sip_stp";
   const isExpiringReport = reportType === "kfintech_sip_stp_expiring";
   const isUnoperationalReport = reportType === "cams_unoperational_sip_stp";
-  const hasTransactionTypeFilter = isActiveReport || isClosedReport;
+  const hasTransactionTypeFilter = isClosedReport;
   const activeFilters = useMemo(() =>
     Object.entries(filters).filter(([key, value]) => {
       if (key === "report_type") return false;
-      if (key === "follow_up_status" && isActiveReport) return false;
       if (key === "transaction_type" && !hasTransactionTypeFilter) return false;
       return Boolean(value) && value !== "all";
     }),
-  [filters, hasTransactionTypeFilter, isActiveReport]);
+  [filters, hasTransactionTypeFilter]);
   const activeFilterCount = activeFilters.length;
   const filterSummary = activeFilterCount
     ? `${activeFilterCount} active filter${activeFilterCount > 1 ? "s" : ""}`
     : "All SIP events";
-  const primaryCountCard = isActiveReport
-    ? { title: "Total Active", value: summary.total_active, icon: CheckCircle2, tone: "green" }
-    : isClosedReport
+  const primaryCountCard = isClosedReport
     ? { title: "Total Closed", value: summary.total_closed, icon: XCircle, tone: "red" }
     : isExpiringReport
     ? { title: "Total Expiring", value: summary.total_expiring, icon: AlertTriangle, tone: "violet" }
     : isUnoperationalReport
     ? { title: "Total Un-operational", value: summary.total_unoperational, icon: XCircle, tone: "red" }
     : { title: "Total Terminated", value: summary.total_terminated, icon: XCircle, tone: "red" };
-  const secondaryCountCard = isActiveReport
-    ? { title: "Starting This Week", value: summary.active_this_week, icon: RefreshCw, tone: "blue" }
-    : isClosedReport
+  const secondaryCountCard = isClosedReport
     ? { title: "Closed This Week", value: summary.closed_this_week, icon: AlertTriangle, tone: "amber" }
     : isExpiringReport
     ? { title: "Expiring This Week", value: summary.expiring_this_week, icon: XCircle, tone: "amber" }
     : isUnoperationalReport
     ? { title: "Ceased This Week", value: summary.unoperational_this_week, icon: AlertTriangle, tone: "amber" }
     : { title: "Total Rejected", value: summary.total_rejected, icon: AlertTriangle, tone: "violet" };
-  const summaryCards = isActiveReport
-    ? [
-        { title: "Total Active", value: summary.total_active, icon: CheckCircle2, tone: "green" },
-        { title: "Starting This Week", value: summary.active_this_week, icon: RefreshCw, tone: "blue" },
-        { title: "Matched Clients", value: summary.matched_records, icon: CheckCircle2, tone: "violet" },
-        { title: "Unmatched", value: summary.unmatched_records, icon: AlertTriangle, tone: "amber" },
-      ]
-    : isClosedReport
+  const summaryCards = isClosedReport
     ? [
         { title: "Pending Follow-ups", value: summary.pending_followups, icon: RefreshCw, tone: "blue" },
         { title: "Total Closed", value: summary.total_closed, icon: XCircle, tone: "red" },
@@ -642,9 +607,8 @@ export default function SipReportPage({ reportTypeValue = DEFAULT_SIP_REPORT_TYP
     1 +
     1 +
     1 +
-    (isActiveReport ? 1 : 0) +
     1 +
-    (!isActiveReport ? 1 : 0) +
+    1 +
     1 +
     1;
 
@@ -915,9 +879,8 @@ export default function SipReportPage({ reportTypeValue = DEFAULT_SIP_REPORT_TYP
                 <th className="px-3 py-2">Date</th>
                 <th className="px-3 py-2">Contact</th>
                 <th className="px-3 py-2">Amount</th>
-                {isActiveReport && <th className="px-3 py-2">Installments</th>}
                 <th className="px-3 py-2">Folio</th>
-                {!isActiveReport && <th className="px-3 py-2">Follow-up</th>}
+                <th className="px-3 py-2">Follow-up</th>
                 <th className="px-3 py-2">Task</th>
                 <th className="px-2 py-2">Remark</th>
               </tr>
@@ -994,28 +957,20 @@ export default function SipReportPage({ reportTypeValue = DEFAULT_SIP_REPORT_TYP
                       <p className="font-semibold">{formatCurrency(event.amount)}</p>
                       <p className="text-xs text-gray-500">{displayFrequency(event.frequency)}</p>
                     </td>
-                    {isActiveReport && (
-                      <td className="px-3 py-3 align-top text-gray-700">
-                        <p className="whitespace-nowrap font-semibold">{displayInstallments(event)}</p>
-                        <p className="text-xs text-gray-500">Paid / Pending</p>
-                      </td>
-                    )}
                     <td className="px-3 py-3 align-top text-gray-700">{event.folio_no || "-"}</td>
-                    {!isActiveReport && (
-                      <td className="px-3 py-3 align-top">
-                        <select
-                          name={`follow_up_${event.id}`}
-                          value={event.follow_up_status}
-                          disabled={rowBusy === event.id}
-                          onChange={(changeEvent) => updateFollowUp(event.id, changeEvent.target.value)}
-                          className={`w-36 rounded-full border px-3 py-1.5 text-xs font-bold capitalize shadow-sm outline-none transition hover:brightness-95 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 ${followUpSelectClass(event.follow_up_status)}`}
-                        >
-                          {FOLLOW_UP_STATUSES.map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </td>
-                    )}
+                    <td className="px-3 py-3 align-top">
+                      <select
+                        name={`follow_up_${event.id}`}
+                        value={event.follow_up_status}
+                        disabled={rowBusy === event.id}
+                        onChange={(changeEvent) => updateFollowUp(event.id, changeEvent.target.value)}
+                        className={`w-36 rounded-full border px-3 py-1.5 text-xs font-bold capitalize shadow-sm outline-none transition hover:brightness-95 focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60 ${followUpSelectClass(event.follow_up_status)}`}
+                      >
+                        {FOLLOW_UP_STATUSES.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="px-3 py-3 align-top">
                       {event.task_id ? (
                         <Link href={`/dashboard/tasks/${event.task_id}`} className="inline-flex items-center gap-1 font-medium text-blue-700 hover:underline">

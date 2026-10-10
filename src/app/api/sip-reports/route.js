@@ -82,18 +82,13 @@ function buildSummary(events, userId) {
     return Boolean(eventDate) && eventDate >= week.start && eventDate <= week.end;
   };
   const unresolved = (event) => event.follow_up_status !== "resolved";
-  const startsThisWeek = (event) =>
-    Boolean(event.start_date) && event.start_date >= week.start && event.start_date <= week.end;
-
   return {
-    active_this_week: events.filter((event) => event.event_type === "active" && startsThisWeek(event)).length,
     terminated_this_week: events.filter((event) => event.event_type === "terminated" && isThisWeek(event)).length,
     paused_this_week: events.filter((event) => event.event_type === "paused" && isThisWeek(event)).length,
     rejected_this_week: events.filter((event) => event.event_type === "rejected" && isThisWeek(event)).length,
     closed_this_week: events.filter((event) => event.event_type === "closed" && isThisWeek(event)).length,
     expiring_this_week: events.filter((event) => event.event_type === "expiring" && isThisWeek(event)).length,
     unoperational_this_week: events.filter((event) => event.event_type === "unoperational" && isThisWeek(event)).length,
-    total_active: events.filter((event) => event.event_type === "active" && unresolved(event)).length,
     total_terminated: events.filter((event) => event.event_type === "terminated" && unresolved(event)).length,
     total_rejected: events.filter((event) => event.event_type === "rejected" && unresolved(event)).length,
     total_closed: events.filter((event) => event.event_type === "closed" && unresolved(event)).length,

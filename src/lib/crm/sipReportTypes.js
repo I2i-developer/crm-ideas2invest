@@ -13,14 +13,6 @@ export const SIP_REPORT_TYPES = [
     description: "Currently supported import format.",
   },
   {
-    value: "kfintech_termination_pause",
-    rta: "kfintech",
-    label: "Active SIP/STP/SWP Report - KFintech",
-    shortLabel: "Active SIP/STP/SWP",
-    supported: true,
-    description: "Imports active SIP/STP/SWP registrations with registration/start/end dates, transaction type, installments, amount, folio, contact, bank/NACH hints, and STP target details.",
-  },
-  {
     value: "kfintech_transaction_rejection",
     rta: "kfintech",
     label: "SIP Transaction Level Rejection Report - KFintech",

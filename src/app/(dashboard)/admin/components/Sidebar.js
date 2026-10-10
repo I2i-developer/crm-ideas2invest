@@ -229,6 +229,7 @@ import {
   ChartNoAxesCombined,
   Sparkles,
   CalendarClock,
+  ClipboardCheck,
 } from "lucide-react";
 
 function isActiveRoute(currentPath, itemPath, matchType = "section") {
@@ -289,6 +290,11 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     { name: "SIP Tracker", path: "/admin/sip-tracker", icon: ChartCandlestick },
     { name: "KYC Status", path: "/admin/kyc-status", icon: IdCard },
     { name: "My Work Tracker", path: "/operations/my-work-tracker", icon: ListChecks, operationsOnly: true },
+    {
+      name: "EOD Reports",
+      path: userData.role === "operations" ? "/operations/eod-report" : "/admin/eod-reports",
+      icon: ClipboardCheck,
+    },
     { name: "Team Performance", path: "/admin/team-performance", icon: ChartNoAxesCombined, adminOnly: true },
     { name: "Self Reminders", path: "/admin/reminders", icon: CalendarClock },
     { name: "Meeting Notes", path: "/admin/meeting-notes", icon: ClipboardList },

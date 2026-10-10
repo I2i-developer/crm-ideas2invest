@@ -43,6 +43,7 @@ import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import HeaderActions from "@/components/HeaderActions";
 import HeaderBrand from "@/components/HeaderBrand";
+import UsageSessionTracker from "@/components/UsageSessionTracker";
 import { Menu } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -92,6 +93,7 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
+      <UsageSessionTracker />
       
       {/* Sidebar */}
       <Sidebar

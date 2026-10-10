@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Sidebar from "@/app/(dashboard)/admin/components/Sidebar";
 import HeaderActions from "@/components/HeaderActions";
 import HeaderBrand from "@/components/HeaderBrand";
+import UsageSessionTracker from "@/components/UsageSessionTracker";
 import { Menu } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -54,6 +55,7 @@ export default function TasksLayout({ children }) {
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
+      <UsageSessionTracker />
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
