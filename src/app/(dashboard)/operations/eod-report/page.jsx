@@ -20,7 +20,6 @@ const emptyForm = {
   client_followups: "",
   tasks_completed: 0,
   tasks_pending: 0,
-  status: "Submitted",
 };
 
 function statusClass(status) {
@@ -94,7 +93,6 @@ export default function OperationsEodReportPage() {
             client_followups: todayReport.client_followups || "",
             tasks_completed: numberValue(todayReport.tasks_completed),
             tasks_pending: numberValue(todayReport.tasks_pending),
-            status: todayReport.status === "Draft" ? "Draft" : "Submitted",
           });
         } else {
           setForm((current) => ({ ...current, report_date: data.today || new Date().toISOString().slice(0, 10) }));
@@ -133,7 +131,6 @@ export default function OperationsEodReportPage() {
       client_followups: report.client_followups || "",
       tasks_completed: numberValue(report.tasks_completed),
       tasks_pending: numberValue(report.tasks_pending),
-      status: report.status === "Draft" ? "Draft" : "Submitted",
     });
     setEditOverlayOpen(true);
   }
@@ -145,7 +142,7 @@ export default function OperationsEodReportPage() {
     try {
       const payload = {
         ...form,
-        status: statusOverride || form.status || "Submitted",
+        status: statusOverride || "Submitted",
         tasks_completed: numberValue(form.tasks_completed),
         tasks_pending: numberValue(form.tasks_pending),
       };
@@ -221,9 +218,6 @@ export default function OperationsEodReportPage() {
           <FormInput label="Report Date" name="report_date" type="date" required maxDate={today} value={form.report_date} onValueChange={(value) => setField("report_date", value)} />
           <FormInput label="Tasks Completed" name="tasks_completed" type="number" value={form.tasks_completed} onValueChange={(value) => setField("tasks_completed", value)} />
           <FormInput label="Tasks Pending" name="tasks_pending" type="number" value={form.tasks_pending} onValueChange={(value) => setField("tasks_pending", value)} />
-          <div>
-            <FormSelect label="Save Status" name="status" options={["Submitted", "Draft"]} value={form.status} onValueChange={(value) => setField("status", value)} />
-          </div>
           <div className="lg:col-span-3">
             <FormInput label="Overall Work Summary" name="work_summary" multiline rows={3} value={form.work_summary} onValueChange={(value) => setField("work_summary", value)} />
           </div>
@@ -327,9 +321,6 @@ export default function OperationsEodReportPage() {
                 <FormInput label="Report Date" name="edit_report_date" type="date" required maxDate={today} value={form.report_date} onValueChange={(value) => setField("report_date", value)} />
                 <FormInput label="Tasks Completed" name="edit_tasks_completed" type="number" value={form.tasks_completed} onValueChange={(value) => setField("tasks_completed", value)} />
                 <FormInput label="Tasks Pending" name="edit_tasks_pending" type="number" value={form.tasks_pending} onValueChange={(value) => setField("tasks_pending", value)} />
-                <div className="lg:col-span-3">
-                  <FormSelect label="Save Status" name="edit_status" options={["Submitted", "Draft"]} value={form.status} onValueChange={(value) => setField("status", value)} />
-                </div>
                 <div className="lg:col-span-3">
                   <FormInput label="Overall Work Summary" name="edit_work_summary" multiline rows={3} value={form.work_summary} onValueChange={(value) => setField("work_summary", value)} />
                 </div>
