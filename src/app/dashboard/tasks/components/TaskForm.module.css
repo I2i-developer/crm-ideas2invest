@@ -5,12 +5,18 @@
 }
 
 .card {
+  position: relative;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 20px;
   padding: 28px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Keep open controls above sibling panels with backdrop filters. */
+.card:focus-within {
+  z-index: 1;
 }
 
 .cardTitle {
@@ -116,9 +122,14 @@
 }
 
 .dateField {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.dateField:focus-within {
+  z-index: 1;
 }
 
 .label {
