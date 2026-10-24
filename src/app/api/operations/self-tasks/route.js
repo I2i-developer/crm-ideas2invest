@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -41,7 +41,7 @@ async function listProfiles(db) {
   const { data } = await db
     .from("profiles")
     .select("id, name, full_name, email, role, is_active, status")
-    .in("role", ["admin", "operations"])
+    .in("role", CRM_USER_ROLES)
     .order("name", { ascending: true, nullsFirst: false });
 
   return (data || [])

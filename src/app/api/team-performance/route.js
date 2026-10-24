@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { buildPerformanceReport } from "@/lib/tasks/performance";
 
@@ -59,7 +59,7 @@ export async function GET(request) {
   return NextResponse.json({
     ...report,
     options: {
-      users: users.filter((profile) => String(profile.role || "").toLowerCase() === "operations"),
+      users: users.filter((profile) => CRM_USER_ROLES.includes(String(profile.role || "").trim().toLowerCase())),
       assigners: users.filter((profile) => String(profile.role || "").toLowerCase() === "admin"),
       clients,
       statuses: [...new Set((tasksRes.data || []).map((task) => task.status).filter(Boolean))],

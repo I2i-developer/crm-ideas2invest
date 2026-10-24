@@ -1,4 +1,5 @@
 import { createClient as createSupabaseServiceClient } from "@supabase/supabase-js";
+import { canUseTasks } from "@/lib/auth/permissions";
 
 export function createTaskServiceClient() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -25,7 +26,7 @@ function isAssignableProfile(profile) {
   const role = String(profile.role || "").trim().toLowerCase();
   const status = String(profile.status || "Active").trim().toLowerCase();
 
-  return ["admin", "operations"].includes(role) && profile.is_active !== false && status !== "inactive";
+  return canUseTasks(role) && profile.is_active !== false && status !== "inactive";
 }
 
 function displayName(profile) {

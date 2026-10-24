@@ -247,12 +247,12 @@ export default function TaskDetailPage() {
                   <LinkIcon size={16} className={styles.detailIcon} />
                   <div>
                     <span className={styles.detailLabel}>Client</span>
-                    <Link
+                    {currentRole === "sales" ? <span className={styles.detailValue}>{task.client.full_name}</span> : <Link
                       href={currentRole === "operations" ? `/admin/clients/${task.client.id}/client-details` : `/admin/clients/${task.client.id}`}
                       className={styles.clientLink}
                     >
                       {task.client.full_name}
-                    </Link>
+                    </Link>}
                   </div>
                 </div>
               )}

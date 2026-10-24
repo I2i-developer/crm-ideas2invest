@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, canUseChat } from "@/lib/auth/permissions";
 import { createNotification } from "@/lib/notifications/service";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -55,7 +55,7 @@ export async function GET(request, { params }) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseChat(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { threadId } = await params;
 
@@ -119,7 +119,7 @@ export async function POST(request, { params }) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseChat(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { threadId } = await params;
   const body = await request.json().catch(() => ({}));
@@ -173,7 +173,7 @@ export async function POST(request, { params }) {
           type: "chat_message",
           entityType: "chat_thread",
           entityId: threadId,
-          linkUrl: `${roleByRecipient.get(userId) === "operations" ? "/operations/dashboard" : "/admin/dashboard"}?chat=${threadId}`,
+          linkUrl: `${roleByRecipient.get(userId) === "sales" ? "/sales" : roleByRecipient.get(userId) === "operations" ? "/operations/dashboard" : "/admin/dashboard"}?chat=${threadId}`,
           metadata: { thread_id: threadId, message_id: message.id, sender_id: user.id },
           dedupeKey: `chat_message:${message.id}:${userId}`,
         })

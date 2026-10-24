@@ -247,6 +247,8 @@ export default function PostLogin() {
           router.replace("/admin/dashboard");
         } else if (profileData.role === "operations") {
           router.replace("/operations/dashboard");
+        } else if (profileData.role === "sales") {
+          router.replace("/sales/dashboard");
         } else {
           setError("Unauthorized role.");
         }

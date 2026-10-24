@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, canUseChat, CHAT_ROLES } from "@/lib/auth/permissions";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +15,12 @@ export async function GET(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseChat(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data, error } = await db
     .from("profiles")
     .select("id, name, full_name, email, avatar_url, role, status, is_active")
-    .in("role", ["admin", "operations"])
+    .in("role", CHAT_ROLES)
     .order("name", { ascending: true, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

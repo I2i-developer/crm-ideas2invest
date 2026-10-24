@@ -213,6 +213,7 @@ function PipelineBars({ metrics = {} }) {
 }
 
 export default function DashboardCharts({ data, mode = "admin" }) {
+  if (mode === "sales") return <div className="grid gap-5 xl:grid-cols-2"><ChartCard title="My Task Status"><DoughnutChart values={data?.tasks_by_status} /></ChartCard><ChartCard title="My Lead Status"><BarChart values={data?.leads_by_status} horizontal /></ChartCard></div>;
   const metrics = data?.metrics || {};
   const taskTitle = mode === "operations" ? "My Task Status" : "Task Status";
   const pipelineSubtitle =

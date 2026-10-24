@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { canUseTasks } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabaseServer";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient, getValidTaskAssigneeIds } from "@/lib/tasks/assignees";
@@ -30,7 +31,7 @@ export async function GET(request, { params }) {
     .single();
   const role = String(profile?.role || "").trim().toLowerCase();
 
-  if (!["admin", "operations"].includes(role)) {
+  if (!canUseTasks(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -48,7 +49,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
-  if (role === "operations") {
+  if (role !== "admin") {
     const { data: assignment, error: assignmentError } = await taskDb
       .from("task_assignments")
       .select("id")
@@ -119,7 +120,7 @@ export async function PUT(request, { params }) {
 
   const isAssigned = existingTaskWithAssignments.task_assignments?.some(a => a.user_id === user.id);
   const role = String(profile?.role || "").trim().toLowerCase();
-  if (role !== "admin" && !(role === "operations" && isAssigned)) {
+  if (role !== "admin" && !(canUseTasks(role) && isAssigned)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,

@@ -99,6 +99,7 @@ export default function SelfRemindersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState([]);
+  const [role, setRole] = useState(null);
   const [reminders, setReminders] = useState([]);
   const [summary, setSummary] = useState({});
   const [filters, setFilters] = useState({ status: "active", due: "all", search: "" });
@@ -142,15 +143,19 @@ export default function SelfRemindersPage() {
     } else {
       setReminders(data.reminders || []);
       setSummary(data.summary || {});
+      setRole(data.role);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    loadClients();
     loadReminders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (role === "admin" || role === "operations") loadClients();
+  }, [role]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => loadReminders(filters), 250);
@@ -262,13 +267,13 @@ export default function SelfRemindersPage() {
               options={priorityOptions}
               onValueChange={(value) => setDraft((current) => ({ ...current, priority: value }))}
             />
-            <FormSelect
+            {(role === "admin" || role === "operations") && <FormSelect
               label="Link Client"
               value={draft.client_id}
               options={clientOptions}
               onValueChange={(value) => setDraft((current) => ({ ...current, client_id: value }))}
               isSearchable
-            />
+            />}
             <FormInput
               label="Notes"
               value={draft.notes}
@@ -339,7 +344,7 @@ export default function SelfRemindersPage() {
                           {reminder.status === "Snoozed" && reminder.snoozed_until ? "Snoozed until " : "Due "}
                           {formatDateTimeDDMonYYYY(dueAt, "-")}
                         </p>
-                        {reminder.client && (
+                        {reminder.client && role !== "sales" && (
                           <Link href={`/admin/clients/${reminder.client.id}`} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:underline dark:text-blue-200">
                             <Link2 size={14} /> {reminder.client.full_name}
                           </Link>

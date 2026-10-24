@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations, canAccessClient } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations, isSales, canAccessClient } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { fallbackMeetingSummary, meetingSummaryPrompt, normalizeSummary, parseAiSummary } from "@/lib/meetings/intelligence";
 
@@ -21,12 +21,17 @@ export async function POST(request) {
   const supabase = await createClient(request);
   const { user, profile, role } = await getAuthContext(supabase);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role) && !isSales(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
   const rawNotes = String(body.raw_notes || "").trim();
   const clientId = body.client_id || null;
   const meetingId = body.meeting_id || null;
+  if (isSales(role)) {
+    if (!meetingId || clientId) return NextResponse.json({ error: "Open a linked sales meeting note first" }, { status: 403 });
+    const { data } = await supabase.from("sales_meetings").select("id").eq("meeting_note_id", meetingId).limit(1);
+    if (!data?.length) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   if (!rawNotes) return NextResponse.json({ error: "Raw meeting notes are required" }, { status: 400 });
   if (clientId && !(await canAccessClient(supabase, user.id, role, clientId))) {

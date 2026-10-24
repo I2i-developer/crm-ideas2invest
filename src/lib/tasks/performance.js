@@ -1,3 +1,5 @@
+import { CRM_USER_ROLES } from "@/lib/auth/permissions";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const TASK_STATUS_GROUPS = {
@@ -163,8 +165,9 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
   });
 
   const uniqueTasks = [...new Map(filtered.map((task) => [task.id, task])).values()];
-  const operationsUsers = users
-    .filter((user) => normalized(user.role) === "operations")
+  const teamUsers = users
+    .filter((user) => CRM_USER_ROLES.includes(normalized(user.role)))
+    .filter((user) => !filters.user_id || user.id === filters.user_id)
     .sort((a, b) => {
       const nameA = a.name || a.full_name || a.email || "";
       const nameB = b.name || b.full_name || b.email || "";
@@ -181,13 +184,14 @@ export function buildPerformanceReport({ tasks, assignments, activities, users, 
     if (filters.date_to && (!taskDate || taskDate > filters.date_to)) return false;
     return true;
   });
-  const userRows = operationsUsers.map((user) => {
+  const userRows = teamUsers.map((user) => {
     const userTasks = filtered.filter((task) => task.assignments.some((assignment) => assignment.user_id === user.id));
     const userSelfTasks = filteredSelfTasks.filter((task) => task.created_by === user.id);
     return {
       id: user.id,
       name: user.name || user.full_name || user.email || "Unnamed user",
-      designation: user.designation || "Operations",
+      role: normalized(user.role),
+      designation: user.designation || (normalized(user.role) === "sales" ? "Sales" : normalized(user.role) === "admin" ? "Admin" : "Operations"),
       ...summarizeTasks(userTasks),
       tasks: userTasks,
       self_activity: {

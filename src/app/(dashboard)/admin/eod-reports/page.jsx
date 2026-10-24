@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, ClipboardCheck, Eye, MessageSquareText, Search, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -206,6 +207,7 @@ export default function AdminEodReportsPage() {
         title="Operations EOD Reports"
         description="Review daily end-of-day reports submitted by operations users."
         icon={ClipboardCheck}
+        actions={<Link href="/sales?view=eod" className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900"><ClipboardCheck size={16} />Sales EOD</Link>}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

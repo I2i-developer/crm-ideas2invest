@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations, canAccessClient } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canUseSharedTools, canAccessClient } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import {
   SELF_REMINDER_PRIORITIES,
@@ -47,7 +47,7 @@ export async function GET(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseSharedTools(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await generateDueSelfReminderNotifications(supabase, user.id);
 
@@ -103,7 +103,7 @@ export async function POST(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseSharedTools(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const title = normalizeText(body.title);

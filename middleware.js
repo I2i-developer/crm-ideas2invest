@@ -36,13 +36,13 @@ export async function middleware(request) {
 
   const { pathname } = request.nextUrl
 
-  const protectedPrefixes = ['/admin', '/dashboard', '/tasks', '/operations', '/notifications', '/system-gate', '/register']
+  const protectedPrefixes = ['/admin', '/dashboard', '/tasks', '/operations', '/sales', '/notifications', '/system-gate', '/register']
 
   if (protectedPrefixes.some((prefix) => pathname.startsWith(prefix)) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && (pathname.startsWith('/admin') || pathname.startsWith('/operations') || pathname.startsWith('/system-gate') || pathname.startsWith('/register'))) {
+  if (user && protectedPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, is_active, status')
@@ -51,10 +51,22 @@ export async function middleware(request) {
 
     const isAdmin = profile?.role === 'admin'
     const isOperations = profile?.role === 'operations'
+    const isSales = profile?.role === 'sales'
     const isInactive = profile?.is_active === false || profile?.status === 'Inactive'
 
     if (isInactive) {
       return NextResponse.redirect(new URL('/login', request.url))
+    }
+    const salesAllowed = pathname === '/sales' || pathname.startsWith('/sales/') ||
+      pathname.startsWith('/admin/meeting-notes') || pathname.startsWith('/admin/settings') ||
+      pathname.startsWith('/admin/reminders') || pathname.startsWith('/admin/calculators') ||
+      pathname.startsWith('/admin/document-requirements') ||
+      pathname.startsWith('/notifications') ||
+      ((pathname === '/dashboard/tasks' || pathname.startsWith('/dashboard/tasks/')) &&
+        !pathname.includes('/create') && !pathname.includes('/edit'))
+    if (isSales && !salesAllowed) return NextResponse.redirect(new URL('/sales/dashboard', request.url))
+    if (pathname.startsWith('/sales') && !isSales && !isAdmin) {
+      return NextResponse.redirect(new URL(isOperations ? '/operations/dashboard' : '/login', request.url))
     }
     const isOperationsAllowedClientPage =
       pathname.startsWith('/admin/clients') &&
@@ -74,7 +86,7 @@ export async function middleware(request) {
       pathname.startsWith('/admin/company') ||
       pathname.startsWith('/admin/settings')
 
-    if (pathname.startsWith('/admin') && !isAdmin && !(isOperations && isOperationsAllowedAdminPage)) {
+    if (pathname.startsWith('/admin') && !isAdmin && !(isOperations && isOperationsAllowedAdminPage) && !(isSales && salesAllowed)) {
       const targetPath = isOperations ? '/operations/dashboard' : '/login'
       return NextResponse.redirect(new URL(targetPath, request.url))
     }
@@ -93,5 +105,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/tasks/:path*', '/operations/:path*', '/notifications/:path*', '/notifications', '/system-gate/:path*', '/register', '/login'],
+  matcher: ['/sales/:path*', '/admin/:path*', '/dashboard/:path*', '/tasks/:path*', '/operations/:path*', '/notifications/:path*', '/notifications', '/system-gate/:path*', '/register', '/login'],
 }

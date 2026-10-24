@@ -43,7 +43,7 @@ export default function HeaderBasicCalculator({ role }) {
   const [open, setOpen] = useState(false);
   const [display, setDisplay] = useState("0");
 
-  const show = role === "operations";
+  const show = role === "operations" || role === "sales";
   const expression = useMemo(() => display === "Error" ? "0" : display, [display]);
   if (!show) return null;
 

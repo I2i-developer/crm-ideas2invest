@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations, canAccessClient } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations, isSales, canAccessClient } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { generateDueSelfReminderNotifications } from "@/lib/reminders/selfReminders";
 
@@ -41,7 +41,7 @@ export async function GET(request) {
   const supabase = await createClient(request);
   const { user, role } = await getAuthContext(supabase);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !isOperations(role) && !isSales(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await generateDueSelfReminderNotifications(supabase, user.id);
 
@@ -57,6 +57,13 @@ export async function GET(request) {
     .select(MEETING_SELECT)
     .order("meeting_datetime", { ascending: false })
     .limit(limit);
+  if (isSales(role)) {
+    const { data: linked, error: linkedError } = await supabase.from("sales_meetings").select("meeting_note_id").not("meeting_note_id", "is", null);
+    if (linkedError) return NextResponse.json({ error: linkedError.message }, { status: 500 });
+    const ids = (linked || []).map((m) => m.meeting_note_id);
+    if (!ids.length) return NextResponse.json({ meetings: [], role });
+    query = query.in("id", ids);
+  }
 
   if (meetingId) query = query.eq("id", meetingId);
   if (clientId) query = query.eq("client_id", clientId);

@@ -1,6 +1,7 @@
 export const ROLES = {
   ADMIN: "admin",
   OPERATIONS: "operations",
+  SALES: "sales",
 };
 
 export const DOCUMENT_LOCKED_STATUSES = ["Verified", "Exception approved"];
@@ -33,6 +34,25 @@ export function isAdmin(role) {
 
 export function isOperations(role) {
   return role === ROLES.OPERATIONS;
+}
+
+export function isSales(role) {
+  return role === ROLES.SALES;
+}
+
+export const CRM_USER_ROLES = [ROLES.ADMIN, ROLES.OPERATIONS, ROLES.SALES];
+export const CHAT_ROLES = CRM_USER_ROLES;
+
+export function canUseSharedTools(role) {
+  return CRM_USER_ROLES.includes(role);
+}
+
+export function canUseTasks(role) {
+  return CRM_USER_ROLES.includes(role);
+}
+
+export function canUseChat(role) {
+  return CHAT_ROLES.includes(role);
 }
 
 export function canManageClients(role) {

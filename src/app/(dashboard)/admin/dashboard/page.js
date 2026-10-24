@@ -185,16 +185,16 @@ export default function AdminDashboard() {
 
       <div className="grid xl:grid-cols-2 gap-5">
         <ListCard
-          title="Operations Performance"
+          title="Team Performance"
           items={data?.operations_summary || []}
-          empty="No operations users found."
+          empty="No active team members found."
           renderItem={(member) => (
             <div key={member.id} className="rounded-lg border bg-white p-3">
               <div className="flex justify-between">
                 <p className="font-medium text-gray-800">{member.name}</p>
                 <p className="text-sm text-gray-500">{member.completed}/{member.assigned} done</p>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Pending {member.pending} / Overdue {member.overdue}</p>
+              <p className="text-xs text-gray-500 mt-1"><span className="capitalize">{member.role}</span> / Pending {member.pending} / Overdue {member.overdue}</p>
             </div>
           )}
         />

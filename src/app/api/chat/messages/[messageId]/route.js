@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canUseChat } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -52,7 +52,7 @@ async function requireChatUser(supabase, request) {
   if (!user) {
     return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  if (!isAdmin(role) && !isOperations(role)) {
+  if (!canUseChat(role)) {
     return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
 

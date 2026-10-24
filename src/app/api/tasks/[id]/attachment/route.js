@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { canUseTasks } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabaseServer";
 
 async function authorizeTaskAccess(supabase, taskId, userId) {
@@ -32,7 +33,7 @@ async function authorizeTaskAccess(supabase, taskId, userId) {
     return { task };
   }
 
-  if (role === "operations") {
+  if (canUseTasks(role)) {
     const { data: assignment, error: assignmentError } = await supabase
       .from("task_assignments")
       .select("id")

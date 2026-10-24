@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, canUseChat } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -74,7 +74,7 @@ export async function GET(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseChat(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const threads = await listThreads(db, user.id);
@@ -93,7 +93,7 @@ export async function POST(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseChat(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const targetUserIds = [...new Set((body.user_ids || [body.user_id]).filter(Boolean))].filter((id) => id !== user.id);
@@ -111,7 +111,7 @@ export async function POST(request) {
   if ((targets || []).length !== targetUserIds.length) return NextResponse.json({ error: "Invalid chat recipient" }, { status: 400 });
 
   const invalidTarget = (targets || []).find((target) =>
-    !["admin", "operations"].includes(target.role) ||
+    !canUseChat(target.role) ||
     target.is_active === false ||
     String(target.status || "Active").toLowerCase() === "inactive"
   );

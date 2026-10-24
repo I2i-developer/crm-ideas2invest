@@ -101,7 +101,7 @@ function getNotes(taxStatus, holdingPattern) {
   ];
 }
 
-export default function DocumentRequirementGuide({ taxStatus }) {
+export default function DocumentRequirementGuide({ taxStatus, canOpenClients = false }) {
   const isIndividual = taxStatus === TAX_STATUS.INDIVIDUAL;
   const [holdingPattern, setHoldingPattern] = useState(HOLDING_PATTERN.SINGLE);
   const effectiveHoldingPattern = isIndividual ? holdingPattern : HOLDING_PATTERN.SINGLE;
@@ -204,9 +204,9 @@ export default function DocumentRequirementGuide({ taxStatus }) {
             <p className="mt-2 text-sm leading-6 text-gray-600">
               Documents are uploaded from the client profile document view. Parsed data then appears in the complete client profile.
             </p>
-            <Link href="/admin/clients" className="mt-4 inline-flex rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+            {canOpenClients && <Link href="/admin/clients" className="mt-4 inline-flex rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
               Open Clients
-            </Link>
+            </Link>}
           </div>
         </aside>
       </section>

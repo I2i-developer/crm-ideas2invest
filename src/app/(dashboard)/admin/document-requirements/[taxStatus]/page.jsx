@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { TAX_STATUS } from "@/lib/crm/onboardingRules";
 import DocumentRequirementGuide from "../DocumentRequirementGuide";
+import { createClient } from "@/lib/supabaseServer";
+import { getAuthContext } from "@/lib/auth/permissions";
 
 const TAX_STATUS_BY_SLUG = {
   individual: TAX_STATUS.INDIVIDUAL,
@@ -14,5 +16,6 @@ export default async function DocumentRequirementTaxStatusPage({ params }) {
 
   if (!selectedTaxStatus) notFound();
 
-  return <DocumentRequirementGuide taxStatus={selectedTaxStatus} />;
+  const { role } = await getAuthContext(await createClient());
+  return <DocumentRequirementGuide taxStatus={selectedTaxStatus} canOpenClients={role === "admin" || role === "operations"} />;
 }

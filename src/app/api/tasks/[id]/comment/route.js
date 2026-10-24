@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { canUseTasks } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabaseServer";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
@@ -57,7 +58,7 @@ export async function POST(request, { params }) {
 
   const role = String(profile?.role || "").trim().toLowerCase();
   const isAssigned = (assignments || []).some((assignment) => assignment.user_id === user.id);
-  if (role !== "admin" && !(role === "operations" && isAssigned)) {
+  if (role !== "admin" && !(canUseTasks(role) && isAssigned)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,

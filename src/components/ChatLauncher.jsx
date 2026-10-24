@@ -273,7 +273,7 @@ export default function ChatLauncher({ profile = null }) {
   }
 
   function readStatusFor(message) {
-    if (currentRole === "operations") return "";
+    if (currentRole !== "admin") return "";
     if (message.sender_id !== currentUserId || message.deleted_at) return "";
     const reads = (message.read_receipts || []).filter((receipt) => receipt.user_id !== currentUserId);
     if (!reads.length) return "Sent";
@@ -568,7 +568,6 @@ export default function ChatLauncher({ profile = null }) {
                   <div>
                     <MessagesSquare className="mx-auto text-gray-400" size={36} />
                     <h3 className="mt-3 font-semibold text-gray-900">Select or start a chat</h3>
-                    <p className="mt-1 text-sm text-gray-500">Search an admin or operations user to begin.</p>
                   </div>
                 </div>
               )}

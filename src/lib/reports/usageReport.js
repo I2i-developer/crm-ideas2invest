@@ -2,15 +2,17 @@ import PDFDocument from "pdfkit";
 import fs from "node:fs";
 import path from "node:path";
 import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
+import { CRM_USER_ROLES } from "@/lib/auth/permissions";
 
 const CRM_TIME_ZONE = "Asia/Kolkata";
 const IST_OFFSET = "+05:30";
-const ROLE_ORDER = { admin: 0, operations: 1 };
+const ROLE_ORDER = { admin: 0, operations: 1, sales: 2 };
 const MODULE_BREAKDOWN_KEYS = [
   "clients",
   "documents",
   "kyc",
   "sip",
+  "sales",
   "tasks",
   "self_work",
   "eod_reports",
@@ -139,6 +141,7 @@ function touchLastActivity(map, key, timestamp) {
 
 function moduleFromAudit(log) {
   const source = `${log.entity_type || ""} ${log.action || ""}`.toLowerCase();
+  if (source.includes("sales")) return "sales";
   if (source.includes("document") || source.includes("parse")) return "documents";
   if (source.includes("sip")) return "sip";
   if (source.includes("kyc")) return "kyc";
@@ -200,7 +203,7 @@ export async function buildUsageReportData(supabase, range) {
       supabase
         .from("profiles")
         .select("id, name, full_name, email, designation, role, is_active, status, created_at")
-        .in("role", ["admin", "operations"])
+        .in("role", CRM_USER_ROLES)
     ),
     runQuery(
       supabase
@@ -291,6 +294,7 @@ export async function buildUsageReportData(supabase, range) {
     documents: 0,
     kyc: 0,
     sip: 0,
+    sales: 0,
     meetings: 0,
     reminders: 0,
     birthdays: 0,

@@ -356,10 +356,10 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
               options={userOptions}
               value={form.assigned_to}
               onValueChange={(value) => setForm({ ...form, assigned_to: value })}
-              placeholder="Select one or more admins or operations users"
+              placeholder="Select one or more team members"
               isMulti
             />
-            <p className={styles.hint}>Select multiple admins or operations users for the same task.</p>
+            <p className={styles.hint}>Assign the task to admin, operations, or sales team members.</p>
           </div>
 
           <div className={styles.fullWidth}>

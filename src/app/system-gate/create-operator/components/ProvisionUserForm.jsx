@@ -34,6 +34,7 @@ const initialManageForm = {
 };
 
 const roleOptions = [
+  { value: "sales", label: "Sales" },
   { value: "operations", label: "Operations" },
   { value: "admin", label: "Admin" },
 ];
@@ -283,7 +284,7 @@ export default function ProvisionUserForm() {
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Internal access</p>
           <h1 className="mt-2 text-3xl font-semibold text-gray-900">CRM User Provisioning</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Hidden admin-only user creation for admin and operations accounts.
+            Hidden admin-only user creation for admin, operations, and sales accounts.
           </p>
         </div>
 
@@ -489,7 +490,7 @@ export default function ProvisionUserForm() {
                   <h2 className="text-xl font-semibold text-gray-800">Change User Password</h2>
                 </div>
                 <p className="text-sm text-gray-500">
-                  Update the login password for any existing admin or operations user. The user is not logged in automatically.
+                  Update the login password for any existing CRM user. The user is not logged in automatically.
                 </p>
 
                 <FormSelect

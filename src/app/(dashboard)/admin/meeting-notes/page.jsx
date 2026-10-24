@@ -256,13 +256,12 @@ export default function MeetingNotesPage() {
     ]);
 
     if (userData?.user?.id) {
-      const [{ data: profile }, { data: clientRows }] = await Promise.all([
-        supabase.from("profiles").select("role").eq("id", userData.user.id).maybeSingle(),
-        supabase.from("clients").select("id, full_name, email, mobile, kyc_status, tax_status, risk_category").order("full_name", { ascending: true }),
-      ]);
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", userData.user.id).maybeSingle();
+      const { data: clientRows } = profile?.role === "sales" ? { data: [] } :
+        await supabase.from("clients").select("id, full_name, email, mobile, kyc_status, tax_status, risk_category").order("full_name", { ascending: true });
       setRole(profile?.role || null);
       setClients(clientRows || []);
-      if (clientId) setForm((current) => ({ ...current, client_id: clientId }));
+      if (clientId && profile?.role !== "sales") setForm((current) => ({ ...current, client_id: clientId }));
     }
 
     const meetingsData = await meetingsRes.json().catch(() => ({}));
@@ -517,13 +516,13 @@ export default function MeetingNotesPage() {
         description="Capture the meeting journey, generate a structured summary, check KYC prompts, and create self reminders."
         icon={Sparkles}
         actions={
-          <button
+          role !== "sales" ? <button
             type="button"
             onClick={startNew}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Plus size={17} /> New Meeting
-          </button>
+          </button> : <Link href="/sales" className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">Sales workspace</Link>
         }
       />
 
@@ -600,7 +599,7 @@ export default function MeetingNotesPage() {
         <section className="space-y-5">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="grid gap-4 lg:grid-cols-2">
-              <FormSelect label="Link Client" value={form.client_id} options={clientOptions} onValueChange={(value) => setForm((current) => ({ ...current, client_id: value }))} isSearchable />
+              {role !== "sales" && <FormSelect label="Link Client" value={form.client_id} options={clientOptions} onValueChange={(value) => setForm((current) => ({ ...current, client_id: value }))} isSearchable />}
               <FormInput label="Meeting Title" value={form.title} onValueChange={(value) => setForm((current) => ({ ...current, title: value }))} placeholder="Example: Portfolio review and KYC discussion" required />
               <FormInput label="Meeting Date/Time" type="datetime-local" value={form.meeting_datetime} onValueChange={(value) => setForm((current) => ({ ...current, meeting_datetime: value }))} />
               <FormSelect label="Meeting Type" value={form.meeting_type} options={meetingTypeOptions} onValueChange={(value) => setForm((current) => ({ ...current, meeting_type: value }))} />
@@ -767,7 +766,7 @@ export default function MeetingNotesPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            {role !== "sales" ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center gap-2">
                 <Bell className="text-amber-600 dark:text-amber-200" size={20} />
                 <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">Self Reminders</h2>
@@ -822,7 +821,7 @@ export default function MeetingNotesPage() {
                   <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">No reminders created for this meeting yet.</p>
                 )}
               </div>
-            </section>
+            </section> : <section className="border-t border-slate-200 p-5 dark:border-slate-700"><Link href="/sales?view=followups" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"><CalendarClock size={16} />Sales follow-ups</Link></section>}
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">

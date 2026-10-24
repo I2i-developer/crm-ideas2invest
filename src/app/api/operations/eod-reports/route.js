@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -83,7 +83,7 @@ async function operationsUsers(db) {
   const { data } = await db
     .from("profiles")
     .select("id, name, full_name, email, role, is_active, status")
-    .eq("role", "operations")
+    .in("role", CRM_USER_ROLES)
     .order("name", { ascending: true, nullsFirst: false });
 
   return (data || [])
@@ -101,7 +101,7 @@ export async function GET(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!CRM_USER_ROLES.includes(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   let query = db
@@ -111,7 +111,7 @@ export async function GET(request) {
     .order("updated_at", { ascending: false })
     .limit(250);
 
-  if (isOperations(role)) query = query.eq("created_by", user.id).is("operation_hidden_at", null);
+  if (!isAdmin(role)) query = query.eq("created_by", user.id).is("operation_hidden_at", null);
   if (isAdmin(role) && searchParams.get("user_id")) query = query.eq("created_by", searchParams.get("user_id"));
   if (searchParams.get("status")) query = query.eq("status", searchParams.get("status"));
   if (searchParams.get("date_from")) query = query.gte("report_date", searchParams.get("date_from"));

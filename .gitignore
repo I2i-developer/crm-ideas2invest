@@ -31,6 +31,9 @@ src/lib/google/vision-key.json
 !/supabase/migrations/
 /supabase/migrations/*
 !/supabase/migrations/202610240001_eod_review_replies.sql
+!/supabase/migrations/202610240002_sales_workspace.sql
+!/supabase/migrations/202610240003_sales_sources.sql
+!/supabase/migrations/202610240004_sales_tools_addresses.sql
 /CRM_PRD.md
 /Updated DOB.xlsx
 /AMC'S FORM.xlsx

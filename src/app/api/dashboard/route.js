@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { getAdminUserIds } from "@/lib/notifications/service";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { getTaskLifecycle, summarizeTasks } from "@/lib/tasks/performance";
@@ -207,13 +207,13 @@ export async function GET(request) {
   const kycStatuses = kycStatusesRes.error ? [] : (kycStatusesRes.data || []);
   const uncheckedKycStatuses = kycStatuses.filter((record) => record.kyc_status === "Not Checked");
 
-  const operationsUsers = (profilesRes.data || []).filter((profile) => {
+  const teamUsers = (profilesRes.data || []).filter((profile) => {
     const profileRole = String(profile.role || "").trim().toLowerCase();
     const profileStatus = String(profile.status || "Active").trim().toLowerCase();
-    return profileRole === "operations" && profile.is_active !== false && profileStatus !== "inactive";
+    return CRM_USER_ROLES.includes(profileRole) && profile.is_active !== false && profileStatus !== "inactive";
   });
 
-  const operationsSummary = operationsUsers.map((profile) => {
+  const operationsSummary = teamUsers.map((profile) => {
     const assignedTasks = allTasks.filter((task) =>
       task.task_assignments?.some((assignment) => assignment.user_id === profile.id)
     );
@@ -221,7 +221,8 @@ export async function GET(request) {
     const taskSummary = summarizeTasks(assignedTasks);
     return {
       id: profile.id,
-      name: profile.name || profile.full_name || profile.email || "Operations User",
+      name: profile.name || profile.full_name || profile.email || "CRM User",
+      role: profile.role,
       assigned: taskSummary.assigned,
       pending: taskSummary.current_workload,
       completed: taskSummary.completed,

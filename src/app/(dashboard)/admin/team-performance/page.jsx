@@ -340,7 +340,7 @@ function UserDrawer({ member, onClose }) {
       <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase text-blue-600">Operations performance</p>
+            <p className="text-xs font-semibold uppercase text-blue-600">Team performance</p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-50">{member.name}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-300">{member.designation}</p>
           </div>
@@ -494,7 +494,7 @@ export default function TeamPerformancePage() {
   };
 
   const filterSelects = useMemo(() => [
-    ["user_id", "Operations User", options(data?.options?.users)],
+    ["user_id", "Team Member", options(data?.options?.users)],
     ["status", "Task Status", (data?.options?.statuses || []).map((value) => ({ value, label: value }))],
     ["priority", "Priority", (data?.options?.priorities || []).map((value) => ({ value, label: value }))],
     ["client_id", "Client", options(data?.options?.clients, "id", "full_name")],
@@ -508,7 +508,7 @@ export default function TeamPerformancePage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      <PageHeader eyebrow="Admin analytics" title="Operations Team Performance" description="Assigned-task workload, completion quality, ageing, and delivery trends." icon={UsersRound} actions={<button type="button" onClick={exportCsv} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"><Download size={16} /> Export CSV</button>} />
+      <PageHeader eyebrow="Admin analytics" title="Team Performance" description="Assigned-task workload, completion quality, ageing, and delivery trends." icon={UsersRound} actions={<button type="button" onClick={exportCsv} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"><Download size={16} /> Export CSV</button>} />
 
       <section className="relative z-30 overflow-visible rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-3 shadow-sm dark:border-slate-700 dark:bg-none dark:bg-slate-900">
         <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
@@ -644,7 +644,7 @@ export default function TeamPerformancePage() {
         <ChartCard title="Overdue Tasks by User" subtitle="Incomplete tasks past their due date."><BarMetric horizontal labels={userNames} datasets={[{ label: "Overdue", data: users.map((user) => user.overdue), backgroundColor: "#dc2626", borderRadius: 7 }]} /></ChartCard>
         <ChartCard title="Task Completion Trend" subtitle="Completed assigned tasks over time."><TrendChart values={data?.charts?.completion_trend} /></ChartCard>
         <ChartCard title="On-time vs Late Completion" subtitle="Tasks with both completion and due dates."><DoughnutMetric values={data?.charts?.on_time_late} /></ChartCard>
-        <ChartCard title="Current Workload Distribution" subtitle="Open assigned tasks by operations user."><BarMetric labels={userNames} datasets={[{ label: "Current workload", data: users.map((user) => user.current_workload), backgroundColor: "#7c3aed", borderRadius: 7 }]} /></ChartCard>
+        <ChartCard title="Current Workload Distribution" subtitle="Open assigned tasks by team member."><BarMetric labels={userNames} datasets={[{ label: "Current workload", data: users.map((user) => user.current_workload), backgroundColor: "#7c3aed", borderRadius: 7 }]} /></ChartCard>
         <ChartCard title="Open-task Ageing" subtitle="Age of incomplete assigned tasks."><BarMetric labels={Object.keys(data?.charts?.ageing || {})} datasets={[{ label: "Tasks", data: Object.values(data?.charts?.ageing || {}), backgroundColor: colors, borderRadius: 7 }]} /></ChartCard>
       </div>
 
@@ -665,7 +665,7 @@ export default function TeamPerformancePage() {
               ))}
             </tbody>
           </table>
-          {!users.length && <p className="p-8 text-center text-sm text-slate-500">No operations users match the selected filters.</p>}
+          {!users.length && <p className="p-8 text-center text-sm text-slate-500">No team members match the selected filters.</p>}
         </div>
       </section>
 

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 
-const ALLOWED_ROLES = ["admin", "operations"];
+const ALLOWED_ROLES = ["admin", "operations", "sales"];
 
 function getServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -142,7 +142,7 @@ export async function POST(request) {
   if (!validEmail(email)) return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
   if (!password) return NextResponse.json({ error: "Password is required" }, { status: 400 });
   if (password !== confirmPassword) return NextResponse.json({ error: "Passwords do not match" }, { status: 400 });
-  if (!ALLOWED_ROLES.includes(role)) return NextResponse.json({ error: "Role must be admin or operations" }, { status: 400 });
+  if (!ALLOWED_ROLES.includes(role)) return NextResponse.json({ error: "Role must be admin, operations, or sales" }, { status: 400 });
 
   const { data: authData, error: authError } = await serviceSupabase.auth.admin.createUser({
     email,
@@ -262,7 +262,7 @@ export async function PATCH(request) {
 
     if (!fullName) return NextResponse.json({ error: "Full name is required" }, { status: 400 });
     if (!validEmail(email)) return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
-    if (!ALLOWED_ROLES.includes(role)) return NextResponse.json({ error: "Role must be admin or operations" }, { status: 400 });
+    if (!ALLOWED_ROLES.includes(role)) return NextResponse.json({ error: "Role must be admin, operations, or sales" }, { status: 400 });
 
     const { data: targetProfile, error: targetProfileError } = await getTargetProfile(serviceSupabase, targetUserId);
 

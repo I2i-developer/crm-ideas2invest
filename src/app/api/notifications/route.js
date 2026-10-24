@@ -5,6 +5,7 @@ import { createNotification } from "@/lib/notifications/service";
 import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { generateDueSelfReminderNotifications } from "@/lib/reminders/selfReminders";
+import { dispatchSalesReminders } from "@/lib/sales/notifications";
 
 async function generateBirthdayNotifications(request, supabase, userId) {
   const response = await fetch(new URL("/api/birthdays?days=1", request.url), {
@@ -68,7 +69,7 @@ function isRetiredInsuranceNotification(notification) {
 export async function GET(request) {
   const supabase = await createClient(request);
   const notificationDb = getTaskDataClient(supabase);
-  const { user } = await getAuthContext(supabase);
+  const { user, role } = await getAuthContext(supabase);
   const { searchParams } = new URL(request.url);
   const recentDays = Number(searchParams.get("recent_days") || 0);
 
@@ -76,6 +77,10 @@ export async function GET(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (["sales", "admin"].includes(role)) {
+    try { await dispatchSalesReminders(notificationDb, user.id); }
+    catch (error) { console.error("Sales reminder dispatch:", error.message); }
+  }
   await generateTaskDateNotifications(supabase, user.id);
   await generateBirthdayNotifications(request, supabase, user.id);
   await generateKycStatusReminder(supabase, user.id);

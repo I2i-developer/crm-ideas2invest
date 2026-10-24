@@ -80,6 +80,8 @@ export default function LoginPage() {
       router.replace("/admin/dashboard");
     } else if (profile.role === "operations") {
       router.replace("/operations/dashboard");
+    } else if (profile.role === "sales") {
+      router.replace("/sales/dashboard");
     } else {
       setError("Unauthorized role.");
       setLoading(false);

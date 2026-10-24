@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function POST(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!CRM_USER_ROLES.includes(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const sessionKey = cleanSessionKey(body.session_key);

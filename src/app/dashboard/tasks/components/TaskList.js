@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { authFetch } from "@/lib/authFetch";
+import { CRM_USER_ROLES } from "@/lib/auth/permissions";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
 import CrmTooltip from "@/components/CrmTooltip";
@@ -109,7 +110,7 @@ export default function TaskList() {
     const { data } = await supabase
       .from("profiles")
       .select("id, name, full_name, email, designation, avatar_url, role, is_active, status")
-      .in("role", ["admin", "operations"])
+      .in("role", CRM_USER_ROLES)
       .order("name", { ascending: true });
 
     setUsers((data || []).filter((user) => user.is_active !== false && user.status !== "Inactive"));
@@ -330,11 +331,11 @@ export default function TaskList() {
             </div>
           ) : (
             <>
-              <div className={`${styles.taskTableHeader} ${currentRole === "operations" ? styles.operationsColumns : ""}`}>
+              <div className={`${styles.taskTableHeader} ${currentRole && currentRole !== "admin" ? styles.operationsColumns : ""}`}>
                 <span>Task</span>
                 <span>Status & Due</span>
-                <span>{currentRole === "operations" ? "Assigned From" : "Assigned To"}</span>
-                {currentRole === "operations" && <span>Assigned To</span>}
+                <span>{currentRole && currentRole !== "admin" ? "Assigned From" : "Assigned To"}</span>
+                {currentRole && currentRole !== "admin" && <span>Assigned To</span>}
                 <span>Actions</span>
               </div>
               {tasks.map((task) => {
@@ -343,7 +344,7 @@ export default function TaskList() {
                 const completedItems = task.task_checklist?.filter((item) => item.is_completed).length || 0;
                 const totalItems = task.task_checklist?.length || 0;
                 const dueTime = formatTaskDueTime(task.due_date);
-                const showAssignedFrom = currentRole === "operations";
+                const showAssignedFrom = currentRole && currentRole !== "admin";
                 const assignments = task.task_assignments || [];
                 const people = showAssignedFrom
                   ? [...new Map(

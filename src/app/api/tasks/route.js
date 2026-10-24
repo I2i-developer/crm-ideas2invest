@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { canUseTasks } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabaseServer";
 import { randomUUID } from "node:crypto";
 import { writeAuditLog } from "@/lib/audit/logger";
@@ -39,12 +40,12 @@ export async function GET(request) {
     .single();
   const role = String(profile?.role || "").trim().toLowerCase();
 
-  if (!["admin", "operations"].includes(role)) {
+  if (!canUseTasks(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let assignedTaskIds = null;
-  if (role === "operations") {
+  if (role !== "admin") {
     const { data: assignments, error: assignmentError } = await taskDb
       .from("task_assignments")
       .select("task_id")

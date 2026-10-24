@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations, canAccessClient } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, isOperations, isSales, canAccessClient } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,11 @@ async function getMeeting(supabase, id) {
 async function canUpdateMeeting(supabase, user, role, meeting) {
   if (!meeting) return false;
   if (isAdmin(role)) return true;
+  if (isSales(role)) {
+    if (meeting.created_by !== user.id || meeting.status === "Finalized") return false;
+    const { data } = await supabase.from("sales_meetings").select("id").eq("meeting_note_id", meeting.id).limit(1);
+    return Boolean(data?.length);
+  }
   if (!isOperations(role)) return false;
   if (meeting.status === "Finalized") return false;
   if (meeting.created_by === user.id) return true;
