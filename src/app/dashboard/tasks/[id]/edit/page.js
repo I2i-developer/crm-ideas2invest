@@ -2,13 +2,15 @@
 
 import { useCallback, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { authFetch } from "@/lib/authFetch";
 import toast from "react-hot-toast";
 import TaskForm from "../../components/TaskForm";
-import { ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BrandLoader from "@/components/BrandLoader";
+import styles from "../TaskDetail.module.css";
 
 export default function EditTaskPage() {
   const { id } = useParams();
@@ -67,6 +69,10 @@ export default function EditTaskPage() {
 
   return (
     <div style={{ padding: "0" }}>
+      <Link href="/dashboard/tasks" className={styles.backBtn}>
+        <ArrowLeft size={16} aria-hidden="true" />
+        <span>Back to Tasks</span>
+      </Link>
       <div style={{ marginBottom: "24px" }}>
         <PageHeader
           eyebrow="Task workspace"

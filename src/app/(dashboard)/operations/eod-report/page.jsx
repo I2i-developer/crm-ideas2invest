@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle2, ClipboardCheck, Edit3, Save, SendHorizontal
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
+import EodReviewReplies from "@/components/EodReviewReplies";
 import { authFetch } from "@/lib/authFetch";
 import FormInput from "@/app/(dashboard)/admin/clients/components/FormInput";
 import FormSelect from "@/app/(dashboard)/admin/clients/components/FormSelect";
@@ -285,10 +286,17 @@ export default function OperationsEodReportPage() {
               </div>
               {report.review_note && (
                 <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">
-                  <strong>Admin review:</strong> {report.review_note}
+                  <strong>Review by {report.reviewed_by_profile?.name || "Admin"}:</strong> <span className="whitespace-pre-wrap break-words">{report.review_note}</span>
                 </div>
               )}
-              {report.status === "Reviewed" && <p className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-emerald-700"><CheckCircle2 size={14} /> Reviewed by admin</p>}
+              <EodReviewReplies report={report} canReply onSent={loadReports} />
+              {report.status === "Reviewed" && (
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 size={14} />
+                  <span>Reviewed by <strong>{report.reviewed_by_profile?.name || "Admin"}</strong></span>
+                  {report.reviewed_at && <time dateTime={report.reviewed_at} className="font-normal text-slate-500 dark:text-slate-400">{formatDateTimeDDMonYYYY(report.reviewed_at)}</time>}
+                </p>
+              )}
             </article>
           ))}
         </div>

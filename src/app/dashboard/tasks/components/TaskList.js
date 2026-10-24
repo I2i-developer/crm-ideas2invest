@@ -82,6 +82,7 @@ export default function TaskList() {
   const [showFilters, setShowFilters] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentRole, setCurrentRole] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [deletingTask, setDeletingTask] = useState(false);
 
@@ -96,6 +97,7 @@ export default function TaskList() {
     } = await supabase.auth.getUser();
 
     if (user) {
+      setCurrentUserId(user.id);
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -328,10 +330,11 @@ export default function TaskList() {
             </div>
           ) : (
             <>
-              <div className={styles.taskTableHeader}>
+              <div className={`${styles.taskTableHeader} ${currentRole === "operations" ? styles.operationsColumns : ""}`}>
                 <span>Task</span>
                 <span>Status & Due</span>
-                <span>Assigned To</span>
+                <span>{currentRole === "operations" ? "Assigned From" : "Assigned To"}</span>
+                {currentRole === "operations" && <span>Assigned To</span>}
                 <span>Actions</span>
               </div>
               {tasks.map((task) => {
@@ -340,9 +343,19 @@ export default function TaskList() {
                 const completedItems = task.task_checklist?.filter((item) => item.is_completed).length || 0;
                 const totalItems = task.task_checklist?.length || 0;
                 const dueTime = formatTaskDueTime(task.due_date);
+                const showAssignedFrom = currentRole === "operations";
+                const assignments = task.task_assignments || [];
+                const people = showAssignedFrom
+                  ? [...new Map(
+                    assignments.filter((assignment) => assignment.user_id === currentUserId)
+                      .map((assignment) => assignment.assigner || task.created_by)
+                      .filter(Boolean)
+                      .map((person) => [person.id, person])
+                  ).values()]
+                  : assignments.map((assignment) => assignment.assignee).filter(Boolean);
 
                 return (
-                  <article key={task.id} className={styles.taskCard}>
+                  <article key={task.id} className={`${styles.taskCard} ${showAssignedFrom ? styles.operationsColumns : ""}`}>
                     <div className={styles.taskMain}>
                       <div className={styles.taskHeader}>
                         <span className={`${styles.priorityBadge} ${PRIORITY_STYLES[task.priority] || styles.priorityMedium}`}>
@@ -350,7 +363,9 @@ export default function TaskList() {
                         </span>
                       </div>
 
-                      <h3 className={styles.taskTitle}>{task.title}</h3>
+                      <h3 className={styles.taskTitle}>
+                        <Link href={`/dashboard/tasks/${task.id}`}>{task.title}</Link>
+                      </h3>
                       {task.description && (
                         <p className={styles.taskDesc}>
                           {task.description.length > 130 ? `${task.description.substring(0, 130)}...` : task.description}
@@ -377,37 +392,75 @@ export default function TaskList() {
                       )}
                     </div>
 
-                    <div className={styles.taskPeople}>
+                    <div className={`${styles.taskPeople} ${showAssignedFrom ? styles.assignedFrom : ""}`}>
+                      <span className={styles.peopleLabel}>{showAssignedFrom ? "Assigned From" : "Assigned To"}</span>
                       <div className={styles.assignees}>
-                        {task.task_assignments?.slice(0, 3).map((assignment) => (
-                          <CrmTooltip key={assignment.id} content={assignment.assignee?.name || "Unassigned"}>
+                        {people.slice(0, 3).map((person, index) => (
+                          <CrmTooltip key={person.id || index} content={person.name || "Unknown user"}>
                             <div className={styles.avatar}>
-                              {assignment.assignee?.avatar_url ? (
+                              {person.avatar_url ? (
                                 <Image
-                                  src={assignment.assignee.avatar_url}
+                                  src={person.avatar_url}
                                   alt=""
                                   width={30}
                                   height={30}
                                   unoptimized
                                 />
                               ) : (
-                                <span>{assignment.assignee?.name?.charAt(0) || "?"}</span>
+                                <span>{person.name?.charAt(0) || "?"}</span>
                               )}
                             </div>
                           </CrmTooltip>
                         ))}
-                        {task.task_assignments?.length > 3 && (
-                          <div className={styles.avatarMore}>+{task.task_assignments.length - 3}</div>
+                        {people.length > 3 && (
+                          <div className={styles.avatarMore}>+{people.length - 3}</div>
                         )}
-                        {!task.task_assignments?.length && <span className={styles.unassigned}>Unassigned</span>}
+                        {!people.length && <span className={styles.unassigned}>{showAssignedFrom ? "Unknown assigner" : "Unassigned"}</span>}
                       </div>
 
-                      {totalItems > 0 && (
+                      {people.length > 0 && (
+                        <span className={styles.assigneeNames}>
+                          {people.map((person) => person.name || "Unknown user").join(", ")}
+                        </span>
+                      )}
+                      {!showAssignedFrom && totalItems > 0 && (
                         <span className={styles.checklistProgress}>
-                          {completedItems}/{totalItems}
+                          <ClipboardList size={14} />
+                          {completedItems}/{totalItems} completed
                         </span>
                       )}
                     </div>
+
+                    {showAssignedFrom && (
+                      <div className={styles.taskPeople}>
+                        <span className={styles.peopleLabel}>Assigned To</span>
+                        <div className={styles.assignees}>
+                          {assignments.slice(0, 3).map((assignment) => (
+                            <CrmTooltip key={assignment.id} content={assignment.assignee?.name || "Unknown user"}>
+                              <div className={styles.avatar}>
+                                {assignment.assignee?.avatar_url ? (
+                                  <Image src={assignment.assignee.avatar_url} alt="" width={30} height={30} unoptimized />
+                                ) : (
+                                  <span>{assignment.assignee?.name?.charAt(0) || "?"}</span>
+                                )}
+                              </div>
+                            </CrmTooltip>
+                          ))}
+                          {assignments.length > 3 && <div className={styles.avatarMore}>+{assignments.length - 3}</div>}
+                          {!assignments.length && <span className={styles.unassigned}>Unassigned</span>}
+                        </div>
+                        {assignments.length > 0 && (
+                          <span className={styles.assigneeNames}>
+                            {assignments.map((assignment) => assignment.assignee?.name || "Unknown user").join(", ")}
+                          </span>
+                        )}
+                        {totalItems > 0 && (
+                          <span className={styles.checklistProgress}>
+                            <ClipboardList size={14} /> {completedItems}/{totalItems} completed
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     <div className={styles.taskActions}>
                       <Link href={`/dashboard/tasks/${task.id}`} className={styles.viewBtn}>

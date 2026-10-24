@@ -27,8 +27,8 @@ export default function TaskStats({ tasks = [] }) {
     { label: "Completed", value: completed, tone: "green", icon: CheckCircle2 },
     { label: "On Hold", value: onHold, tone: "gray", icon: PauseCircle },
     { label: "Follow-up", value: followUp, tone: "blue", icon: Clock3 },
-    { label: "Waiting Approval", value: waiting, tone: "gray", icon: PauseCircle },
-    { label: "Priority", value: highPriority, tone: "red", icon: Flame },
+    // { label: "Waiting Approval", value: waiting, tone: "gray", icon: PauseCircle },
+    // { label: "Priority", value: highPriority, tone: "red", icon: Flame },
   ];
 
   return (

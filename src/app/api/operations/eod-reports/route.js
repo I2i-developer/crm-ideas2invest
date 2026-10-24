@@ -128,11 +128,25 @@ export async function GET(request) {
       .some((value) => String(value).toLowerCase().includes(search));
   });
 
-  const profileMap = await getProfiles(db, filtered.flatMap((report) => [report.created_by, report.reviewed_by]));
+  let replies = [];
+  if (filtered.length) {
+    const { data: replyData, error: replyError } = await db.from("operation_eod_replies")
+      .select("*").in("report_id", filtered.map((report) => report.id))
+      .order("created_at", { ascending: true });
+    if (replyError) return NextResponse.json({ error: replyError.message }, { status: 500 });
+    replies = replyData || [];
+  }
+  const profileMap = await getProfiles(db, [
+    ...filtered.flatMap((report) => [report.created_by, report.reviewed_by]),
+    ...replies.map((reply) => reply.created_by),
+  ]);
   const reports = filtered.map((report) => ({
     ...report,
     created_by_profile: profileMap.get(report.created_by) || null,
     reviewed_by_profile: profileMap.get(report.reviewed_by) || null,
+    replies: replies.filter((reply) => reply.report_id === report.id).map((reply) => ({
+      ...reply, author_name: profileMap.get(reply.created_by)?.name || "Operations user",
+    })),
   }));
 
   const summary = {

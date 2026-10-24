@@ -27,7 +27,10 @@ src/lib/google/vision-key.json
 .next-dev-*.log
 
 # local/internal project artifacts
-/supabase/
+/supabase/*
+!/supabase/migrations/
+/supabase/migrations/*
+!/supabase/migrations/202610240001_eod_review_replies.sql
 /CRM_PRD.md
 /Updated DOB.xlsx
 /AMC'S FORM.xlsx

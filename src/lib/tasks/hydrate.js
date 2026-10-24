@@ -64,6 +64,7 @@ export async function hydrateTaskList(taskDb, tasks) {
     const enriched = {
       ...assignment,
       assignee: profileMap.get(assignment.user_id) || null,
+      assigner: profileMap.get(assignment.assigned_by) || null,
     };
     const current = assignmentsByTask.get(assignment.task_id) || [];
     current.push(enriched);

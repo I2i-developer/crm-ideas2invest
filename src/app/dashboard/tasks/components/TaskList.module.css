@@ -256,10 +256,10 @@
 
 .taskCard {
   display: grid;
-  grid-template-columns: minmax(260px, 1.5fr) minmax(230px, 0.9fr) minmax(150px, 0.55fr) auto;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 0.55fr) auto;
   align-items: center;
   gap: 18px;
-  padding: 15px 16px;
+  padding: 20px 16px;
   border-bottom: 1px solid #edf2f7;
   background: #ffffff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), inset 0 -10px 22px rgba(15, 23, 42, 0.04);
@@ -273,8 +273,25 @@
   background: #f8fafc;
 }
 
+.operationsColumns {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 0.55fr) minmax(0, 0.55fr) auto;
+}
+
+.peopleLabel {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.taskCard:focus-within {
+  background: #f8fafc;
+  box-shadow: inset 3px 0 #2563eb;
+}
+
 .taskMain {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .taskHeader {
@@ -342,6 +359,10 @@
   font-size: 13px;
   line-height: 1.45;
   color: #64748b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .taskMeta {
@@ -403,9 +424,32 @@
 
 .taskPeople {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
+}
+
+.assigneeNames {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.assignedFrom {
+  align-items: center;
+  text-align: center;
+}
+
+.taskTitle a:hover {
+  color: #2563eb;
+}
+
+.taskTitle a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .assignees {
@@ -461,6 +505,7 @@
 }
 
 .checklistProgress {
+  gap: 5px;
   padding: 0 9px;
   color: #475569;
   background: #f8fafc;
@@ -541,12 +586,15 @@
 @media (max-width: 1180px) {
   .taskTableHeader,
   .taskCard {
-    grid-template-columns: minmax(240px, 1fr) minmax(210px, 0.8fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
   }
 
-  .taskTableHeader span:nth-child(3),
-  .taskTableHeader span:nth-child(4) {
+  .taskTableHeader span:nth-child(n+3) {
     display: none;
+  }
+
+  .peopleLabel {
+    display: block;
   }
 
   .taskPeople,
@@ -579,6 +627,21 @@
 
   .taskCard {
     grid-template-columns: 1fr;
+    gap: 14px;
+    margin: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .taskCard:last-child {
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .taskActions {
+    justify-content: flex-end;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
   }
 }
 
@@ -589,6 +652,8 @@
 }
 
 :global(.dark) .subtitle,
+:global(.dark) .assigneeNames,
+:global(.dark) .peopleLabel,
 :global(.dark) .taskDesc,
 :global(.dark) .listHeader,
 :global(.dark) .listHeader p,
@@ -659,6 +724,7 @@
   background: rgba(15, 23, 42, 0.94) !important;
   border-bottom-color: rgba(71, 85, 105, 0.6) !important;
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.16), inset 0 -12px 24px rgba(0, 0, 0, 0.18);
+  border-color: rgba(71, 85, 105, 0.6);
 }
 
 :global(.dark) .taskCard:hover {

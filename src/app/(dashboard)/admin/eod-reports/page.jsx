@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardCheck, Eye, MessageSquareText, Search, Trash2, X
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PageHeader from "@/components/PageHeader";
+import EodReviewReplies from "@/components/EodReviewReplies";
 import { authFetch } from "@/lib/authFetch";
 import FormInput from "@/app/(dashboard)/admin/clients/components/FormInput";
 import FormSelect from "@/app/(dashboard)/admin/clients/components/FormSelect";
@@ -310,9 +311,10 @@ export default function AdminEodReportsPage() {
 
               {report.review_note && !reviewing && (
                 <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">
-                  <strong>Review note:</strong> {report.review_note}
+                  <strong>Review note:</strong> <span className="whitespace-pre-wrap break-words">{report.review_note}</span>
                 </div>
               )}
+              <EodReviewReplies report={report} />
             </article>
           );
         })}
@@ -390,9 +392,10 @@ function EodViewOverlay({ report, toneIndex, onClose }) {
 
           {report.review_note && (
             <section className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <strong>Review note:</strong> {report.review_note}
+              <strong>Review note:</strong> <span className="whitespace-pre-wrap break-words">{report.review_note}</span>
             </section>
           )}
+          <EodReviewReplies report={report} />
         </div>
       </div>
     </div>
