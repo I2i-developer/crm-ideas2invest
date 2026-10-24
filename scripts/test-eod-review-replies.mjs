@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { SourceTextModule, SyntheticModule } from "node:vm";
+import { createRequire } from "node:module";
 
 const source = await readFile(new URL("../src/app/api/operations/eod-reports/[id]/replies/route.js", import.meta.url), "utf8");
 
@@ -35,7 +36,7 @@ async function invoke({ role = "operations", loggedIn = true, message = "Work co
     "@/lib/supabaseServer": { createClient: async () => ({}) },
     "@/lib/auth/permissions": {
       getAuthContext: async () => ({ user: loggedIn ? { id: "operator-1" } : null, profile: {}, role }),
-      isOperations: (value) => value === "operations",
+      canSubmitEod: (value) => ["operations", "sales"].includes(value),
     },
     "@/lib/tasks/assignees": { getTaskDataClient: () => db },
     "@/lib/audit/logger": { writeAuditLog: async (_, value) => audits.push(value) },
@@ -53,7 +54,7 @@ async function invoke({ role = "operations", loggedIn = true, message = "Work co
   return { response, writes, audits, filters };
 }
 
-test("requires login and operations role", async () => {
+test("requires login and an EOD submitting role", async () => {
   for (const [options, status] of [[{ loggedIn: false }, 401], [{ role: "admin" }, 403], [{ role: "viewer" }, 403]]) {
     const result = await invoke(options);
     assert.equal(result.response.status, status);
@@ -94,8 +95,49 @@ test("stores trimmed reply, review context, authenticated author, and audit", as
   assert.equal(result.audits[0].action, "operation_eod_review_replied");
 });
 
+test("Sales can reply to their own review but not another user's report", async () => {
+  const own = await invoke({ role: "sales" });
+  assert.equal(own.response.status, 201);
+  assert.equal(own.writes[0].created_by, "operator-1");
+  assert.equal((await invoke({ role: "sales", owned: false })).response.status, 404);
+});
+
 test("returns database errors without recording success", async () => {
   const result = await invoke({ insertError: { message: "Database unavailable" } });
   assert.equal(result.response.status, 500);
   assert.equal(result.audits.length, 0);
+});
+
+const require = createRequire(import.meta.url);
+const PGlite = process.env.PGLITE_MODULE ? require(process.env.PGLITE_MODULE).PGlite : null;
+test("Sales reply RLS allows only own visible reports and preserves Operations access", { skip: !PGlite }, async () => {
+  const db = new PGlite();
+  const sales = "00000000-0000-4000-8000-000000000001", ops = "00000000-0000-4000-8000-000000000002";
+  const own = "aaaaaaaa-1111-4111-8111-111111111111", other = "bbbbbbbb-1111-4111-8111-111111111111", hidden = "cccccccc-1111-4111-8111-111111111111";
+  try {
+    await db.exec(`CREATE ROLE authenticated; CREATE SCHEMA auth;
+      CREATE TABLE auth.users(id uuid PRIMARY KEY);
+      CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+      CREATE TABLE profiles(id uuid PRIMARY KEY,role text);
+      CREATE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
+      CREATE TABLE operation_eod_reports(id uuid PRIMARY KEY,created_by uuid,review_note text,operation_hidden_at timestamptz);
+      INSERT INTO auth.users VALUES ('${sales}'),('${ops}');
+      INSERT INTO profiles VALUES ('${sales}','sales'),('${ops}','operations');
+      INSERT INTO operation_eod_reports VALUES ('${own}','${sales}','Review',NULL),('${other}','${ops}','Review',NULL),('${hidden}','${sales}','Review',now());
+      GRANT USAGE ON SCHEMA auth TO authenticated;
+      GRANT SELECT ON profiles,operation_eod_reports TO authenticated;`);
+    await db.exec(await readFile(new URL("../supabase/migrations/202610240001_eod_review_replies.sql", import.meta.url), "utf8"));
+    const before = (await db.query("SELECT * FROM operation_eod_reports ORDER BY id")).rows;
+    const migration = await readFile(new URL("../supabase/migrations/202610240005_sales_eod_parity.sql", import.meta.url), "utf8");
+    await db.exec(migration); await db.exec(migration);
+    assert.deepEqual((await db.query("SELECT * FROM operation_eod_reports ORDER BY id")).rows, before);
+    await db.exec(`GRANT INSERT,SELECT ON operation_eod_replies TO authenticated; SET request.jwt.claim.sub='${sales}'; SET ROLE authenticated;`);
+    const reply = (report, author = sales, note = "Review") => db.query("INSERT INTO operation_eod_replies(report_id,created_by,message,review_note) VALUES ($1,$2,'Reply',$3)", [report,author,note]);
+    await reply(own);
+    for (const args of [[other], [hidden], [own, ops], [own, sales, "Wrong review"]]) await assert.rejects(reply(...args), /row-level security/);
+    await db.exec(`RESET ROLE; SET request.jwt.claim.sub='${ops}'; SET ROLE authenticated;`);
+    await reply(other, ops);
+    await db.exec("RESET ROLE");
+    assert.equal((await db.query("SELECT count(*)::int n FROM operation_eod_replies")).rows[0].n, 2);
+  } finally { await db.close(); }
 });

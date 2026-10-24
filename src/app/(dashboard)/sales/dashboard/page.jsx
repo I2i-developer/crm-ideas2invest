@@ -65,6 +65,6 @@ export default function SalesDashboard() {
       <WorkList title="Scheduled Meetings" rows={data?.meetings} empty="No upcoming meetings." render={(row) => <Link key={row.id} className={itemClass} href={leadLink(row, "calendar")}><p className="font-semibold">{row.lead.name}</p><p className="text-xs text-gray-500">{formatDateTimeDDMonYYYY(row.starts_at)}</p></Link>} />
       <WorkList title="Self Reminders" rows={data?.reminders} empty="No active reminders." render={(row) => <Link key={row.id} className={itemClass} href="/admin/reminders"><p className="font-semibold">{row.title}</p><p className="text-xs text-gray-500">{formatDateTimeDDMonYYYY(row.snoozed_until || row.reminder_at)}</p></Link>} />
     </div>
-    <Link href="/sales/eod-history" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"><History size={16} />EOD History ({data?.metrics.historical_eod_reports || 0})</Link>
+    <Link href="/sales/eod-report" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300"><History size={16} />EOD Reports ({data?.metrics.historical_eod_reports || 0})</Link>
   </div>;
 }

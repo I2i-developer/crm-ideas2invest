@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canSubmitEod } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -47,7 +47,7 @@ export async function PATCH(request, { params }) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !canSubmitEod(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data: existing, error: readError } = await db
     .from("operation_eod_reports")
@@ -110,7 +110,7 @@ export async function DELETE(request, { params }) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin(role) && !canSubmitEod(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data: existing, error: readError } = await db
     .from("operation_eod_reports")

@@ -191,8 +191,17 @@ test("Sales can read their historical EOD reports after conversion, not another 
   const response = await route.GET(request({}, "?user_id=ops"));
   assert.equal(response.status, 200);
   assert.deepEqual(response.data.reports.map((row) => row.id), ["own"]);
-  assert.equal((await route.POST(request({ completed_work: "No new operations EOD" }))).status, 403);
-  assert.equal(db.writes.length, 0);
+  const created = await route.POST(request({ report_date: "2026-10-23", completed_work: "Sales work completed", created_by: "ops", status: "Reviewed" }));
+  assert.equal(created.status, 201);
+  assert.equal(created.data.report.created_by, "sales");
+  assert.equal(created.data.report.status, "Submitted");
+  const detail = (await load("src/app/api/operations/eod-reports/[id]/route.js", apiMocks(db))).namespace;
+  assert.equal((await detail.PATCH(request({ completed_work: "Updated sales work", status: "Submitted" }), context("own"))).status, 200);
+  assert.equal((await detail.PATCH(request({ completed_work: "Forbidden" }), context("private"))).status, 403);
+  assert.equal((await detail.DELETE(request(), context("private"))).status, 403);
+  assert.equal((await detail.DELETE(request(), context("own"))).data.hidden, true);
+  assert.ok(db.tables.operation_eod_reports.find((row) => row.id === "own").operation_hidden_at);
+  assert.ok(!db.writes.some((write) => write.mode === "delete"));
 });
 
 test("Usage PDF data includes Sales activity and active time, without exporting lead data", async () => {

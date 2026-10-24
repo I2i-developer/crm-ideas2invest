@@ -289,14 +289,13 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     { name: "Birthdays", path: "/admin/birthdays", icon: Cake },
     { name: "Tasks", path: "/dashboard/tasks", icon: ListTodo },
     { name: "Calling Desk", path: "/sales", icon: PhoneCall, adminOnly: true, matchType: "exact" },
-    { name: "EOD History", path: "/sales/eod-history", icon: ClipboardCheck, salesOnly: true },
     { name: "SIP Tracker", path: "/admin/sip-tracker", icon: ChartCandlestick },
     { name: "KYC Status", path: "/admin/kyc-status", icon: IdCard },
     { name: "My Work Tracker", path: "/operations/my-work-tracker", icon: ListChecks, operationsOnly: true },
     { name: "Team Performance", path: "/admin/team-performance", icon: ChartNoAxesCombined, adminOnly: true },
     {
       name: "EOD Reports",
-      path: userData.role === "operations" ? "/operations/eod-report" : "/admin/eod-reports",
+      path: userData.role === "sales" ? "/sales/eod-report" : userData.role === "operations" ? "/operations/eod-report" : "/admin/eod-reports",
       icon: ClipboardCheck,
     },
     { name: "Self Reminders", path: "/admin/reminders", icon: CalendarClock },
@@ -308,7 +307,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     { name: "Company", path: "/admin/company", icon: null, companyLogo: true },
     { name: "Audit", path: "/admin/audit", icon: ShieldCheck, adminOnly: true },
   ].filter((item) => {
-      if (userData.role === "sales") return ["Dashboard", "Calling Desk", "Tasks", "Meeting Notes", "Self Reminders", "Calculators", "Required Docs", "EOD History"].includes(item.name);
+      if (userData.role === "sales") return ["Dashboard", "Calling Desk", "Tasks", "Meeting Notes", "Self Reminders", "Calculators", "Required Docs", "EOD Reports"].includes(item.name);
     if (item.salesOnly) return false;
     if (item.adminOnly && userData.role !== "admin") return false;
     if (item.operationsOnly && userData.role !== "operations") return false;

@@ -139,8 +139,12 @@ For the explicitly requested Jalaj/Rajat role changes, the guarded script is
 when applying those two named account changes. It preserves Auth/profile IDs,
 updates only the CRM role and Auth role metadata, verifies linked record hashes,
 and records an audit entry. No user accounts are deleted or recreated. The
-`/sales/eod-history` page provides read-only access to existing own EOD reports;
-admin EOD filters include the users even after their role changes.
+`/sales/eod-report` page currently shares the Operations EOD screen and workflow:
+submit/edit own reports, hide own reports, and reply to admin reviews. The old
+`/sales/eod-history` URL redirects here. Admin review/permanent deletion remain
+admin-only. Run `202610240005_sales_eod_parity.sql` to allow own Sales review
+replies through database RLS as well. The migration changes no stored records.
+Admin EOD filters include users even after their role changes.
 
 `node --experimental-vm-modules --test scripts/test-sales.mjs`
 

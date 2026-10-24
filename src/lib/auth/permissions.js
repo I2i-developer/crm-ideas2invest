@@ -40,6 +40,10 @@ export function isSales(role) {
   return role === ROLES.SALES;
 }
 
+export function canSubmitEod(role) {
+  return isOperations(role) || isSales(role);
+}
+
 export const CRM_USER_ROLES = [ROLES.ADMIN, ROLES.OPERATIONS, ROLES.SALES];
 export const CHAT_ROLES = CRM_USER_ROLES;
 

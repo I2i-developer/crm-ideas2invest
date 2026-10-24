@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, canSubmitEod } from "@/lib/auth/permissions";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { writeAuditLog } from "@/lib/audit/logger";
 
@@ -9,7 +9,7 @@ export async function POST(request, { params }) {
   const supabase = await createClient(request);
   const { user, profile, role } = await getAuthContext(supabase);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isOperations(role)) return NextResponse.json({ error: "Only operations users can reply to reviews" }, { status: 403 });
+  if (!canSubmitEod(role)) return NextResponse.json({ error: "Only operations and sales users can reply to reviews" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const message = typeof body.message === "string" ? body.message.trim() : "";

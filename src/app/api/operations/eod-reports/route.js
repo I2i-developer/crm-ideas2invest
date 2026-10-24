@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations, CRM_USER_ROLES } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canSubmitEod, CRM_USER_ROLES } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
@@ -173,7 +173,7 @@ export async function POST(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isOperations(role)) return NextResponse.json({ error: "Only operations users can submit EOD reports" }, { status: 403 });
+  if (!canSubmitEod(role)) return NextResponse.json({ error: "Only operations and sales users can submit EOD reports" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const reportDate = dateKey(body.report_date);
