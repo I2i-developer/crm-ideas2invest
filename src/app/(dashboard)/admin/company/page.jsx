@@ -199,7 +199,7 @@ export default function CompanyPage() {
       <PageHeader
         eyebrow="Company workspace"
         title="Company"
-        description={isAdmin ? "Company details and portal credential vault." : "Company details for operations reference."}
+        description={isAdmin ? "Company details and portal credential vault." : "Company details for team reference."}
         icon={Building2}
       />
 

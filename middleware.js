@@ -60,7 +60,7 @@ export async function middleware(request) {
     const salesAllowed = pathname === '/sales' || pathname.startsWith('/sales/') ||
       pathname.startsWith('/admin/meeting-notes') || pathname.startsWith('/admin/settings') ||
       pathname.startsWith('/admin/reminders') || pathname.startsWith('/admin/calculators') ||
-      pathname.startsWith('/admin/document-requirements') ||
+      pathname.startsWith('/admin/document-requirements') || pathname === '/admin/company' ||
       pathname.startsWith('/notifications') ||
       ((pathname === '/dashboard/tasks' || pathname.startsWith('/dashboard/tasks/')) &&
         !pathname.includes('/create') && !pathname.includes('/edit'))

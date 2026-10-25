@@ -25,9 +25,9 @@ export async function GET(request) {
     const uid = ctx.user.id, now = new Date().toISOString(), today = istDate();
     const [assignments, leads, followups, meetings, reminders, daily, history] = await Promise.all([
       rows(() => ctx.db.from("task_assignments").select("id,task_id").eq("user_id", uid)),
-      rows(() => ctx.db.from("sales_leads").select("id,name,status,source_id,updated_at").eq("assigned_to", uid).is("archived_at", null)),
-      rows(() => ctx.db.from("sales_followups").select("id,lead_id,title,due_at,lead:sales_leads!inner(name,source_id,assigned_to,archived_at)").eq("user_id", uid).eq("lead.assigned_to", uid).eq("status", "Pending").is("lead.archived_at", null)),
-      rows(() => ctx.db.from("sales_meetings").select("id,lead_id,starts_at,lead:sales_leads!inner(name,source_id,assigned_to,archived_at)").eq("assigned_to", uid).eq("lead.assigned_to", uid).eq("status", "Scheduled").gte("ends_at", now).is("lead.archived_at", null)),
+      rows(() => ctx.db.from("sales_leads").select("id,name,status,source_id,updated_at").contains("assigned_user_ids", [uid]).is("archived_at", null)),
+      rows(() => ctx.db.from("sales_followups").select("id,lead_id,title,due_at,lead:sales_leads!inner(name,source_id,assigned_to,assigned_user_ids,archived_at)").contains("lead.assigned_user_ids", [uid]).eq("status", "Pending").is("lead.archived_at", null)),
+      rows(() => ctx.db.from("sales_meetings").select("id,lead_id,starts_at,lead:sales_leads!inner(name,source_id,assigned_to,assigned_user_ids,archived_at)").contains("lead.assigned_user_ids", [uid]).eq("status", "Scheduled").gte("ends_at", now).is("lead.archived_at", null)),
       rows(() => ctx.db.from("client_meeting_reminders").select("id,title,status,reminder_at,snoozed_until").eq("user_id", uid).in("status", ["Pending", "Snoozed"])),
       ctx.supabase.rpc("sales_daily_eod", { p_date: today, p_user: uid }),
       ctx.db.from("operation_eod_reports").select("id", { count: "exact", head: true }).eq("created_by", uid).is("operation_hidden_at", null),

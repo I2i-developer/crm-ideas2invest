@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canUseSharedTools } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 
 function canManage(user, role, note) {
-  return isAdmin(role) || (isOperations(role) && note.created_by === user.id);
+  return isAdmin(role) || (canUseSharedTools(role) && note.created_by === user.id);
 }
 
 async function getNote(supabase, id) {

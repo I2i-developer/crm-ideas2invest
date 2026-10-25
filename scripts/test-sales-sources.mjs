@@ -35,6 +35,7 @@ function queryDatabase(tables) {
       eq(key, value) { checks.push((row) => key.split('.').reduce((v, k) => v?.[k], row) === value); return this; },
       is(key, value) { return this.eq(key, value); },
       in(key, values) { checks.push((row) => values.includes(row[key])); return this; },
+      contains(key, values) { checks.push((row) => values.every((value) => (key.split('.').reduce((v, k) => v?.[k], row) || []).includes(value))); return this; },
       then(resolve, reject) { const data = (tables[table] || []).filter((row) => checks.every((check) => check(row))); return Promise.resolve({ data, count: data.length }).then(resolve, reject); },
     };
     return query;
@@ -53,32 +54,34 @@ function mocks(ctx) {
 }
 test("queue requires a source and intersects it with Sales ownership", async () => {
   const db = queryDatabase({ sales_lead_queue: [
-    { id: "a", source_id: sourceA, assigned_to: sales, archived_at: null },
-    { id: "b", source_id: sourceB, assigned_to: sales, archived_at: null },
-    { id: "c", source_id: sourceA, assigned_to: other, archived_at: null },
+    { id: "a", source_id: sourceA, assigned_to: sales, assigned_user_ids: [sales], archived_at: null },
+    { id: "b", source_id: sourceB, assigned_to: sales, assigned_user_ids: [sales], archived_at: null },
+    { id: "c", source_id: sourceA, assigned_to: other, assigned_user_ids: [other], archived_at: null },
+    { id: "shared", source_id: sourceA, assigned_to: other, assigned_user_ids: [other, sales], archived_at: null },
   ] });
   for (const role of ["admin", "sales"]) {
     const route = await load("src/app/api/sales/route.js", mocks({ db, role, user: { id: sales }, profile: {} }));
     assert.equal((await route.GET(new Request("https://crm.test/api/sales"))).data.leads.length, 0);
     const response = await route.GET(new Request(`https://crm.test/api/sales?source=${sourceA}`));
-    assert.deepEqual(response.data.leads.map((row) => row.id), role === "admin" ? ["a", "c"] : ["a"]);
+    assert.deepEqual(response.data.leads.map((row) => row.id), role === "admin" ? ["a", "c", "shared"] : ["a", "shared"]);
     assert.equal((await route.GET(new Request("https://crm.test/api/sales?source=invalid"))).status, 400);
   }
 });
 
 test("follow-ups and calendar are source-scoped as well as owner-scoped", async () => {
-  const lead = (source_id, assigned_to) => ({ source_id, assigned_to, archived_at: null });
+  const lead = (source_id, assigned_to) => ({ source_id, assigned_to, assigned_user_ids: [assigned_to], archived_at: null });
   const rows = [
     { id: "a", status: "Pending", lead: lead(sourceA, sales) },
     { id: "b", status: "Pending", lead: lead(sourceB, sales) },
     { id: "c", status: "Pending", lead: lead(sourceA, other) },
+    { id: "shared", status: "Pending", lead: { ...lead(sourceA, other), assigned_user_ids: [other, sales] } },
   ];
   const db = queryDatabase({ sales_followups: rows, sales_meetings: rows });
   for (const [file, key] of [["followups", "followups"], ["calendar", "meetings"]]) {
     const route = await load(`src/app/api/sales/${file}/route.js`, mocks({ db, role: "sales", user: { id: sales } }));
     const params = "from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z";
     assert.equal((await route.GET(new Request(`https://crm.test/api/sales/${file}?${params}`))).data[key].length, 0);
-    assert.deepEqual((await route.GET(new Request(`https://crm.test/api/sales/${file}?${params}&source=${sourceA}`))).data[key].map((row) => row.id), ["a"]);
+    assert.deepEqual((await route.GET(new Request(`https://crm.test/api/sales/${file}?${params}&source=${sourceA}`))).data[key].map((row) => row.id), ["a", "shared"]);
   }
 });
 
@@ -101,13 +104,13 @@ test("address is optional on import, validated, and kept out of other field chan
 
 test("sales dashboard scopes all data to the logged-in user, even for admins", async () => {
   const time = new Date().toISOString();
-  const lead = (assigned_to) => ({ assigned_to, archived_at: null, name: assigned_to === sales ? "My lead" : "Private lead", source_id: sourceA });
+  const lead = (assigned_to) => ({ assigned_to, assigned_user_ids: [assigned_to], archived_at: null, name: assigned_to === sales ? "My lead" : "Private lead", source_id: sourceA });
   const tables = {
     task_assignments: [{ id: "a", task_id: "mine", user_id: sales }, { id: "b", task_id: "private", user_id: other }],
     tasks: [{ id: "mine", title: "My task", status: "Pending", created_at: time }, { id: "private", title: "Private task", status: "Pending", created_at: time }],
-    sales_leads: [{ id: "a", ...lead(sales), status: "New" }, { id: "b", ...lead(other), status: "New" }],
-    sales_followups: [sales, other].map((id) => ({ id, user_id: id, status: "Pending", due_at: time, lead: lead(id) })),
-    sales_meetings: [sales, other].map((id) => ({ id, assigned_to: id, status: "Scheduled", starts_at: time, lead: lead(id) })),
+    sales_leads: [{ id: "a", ...lead(sales), status: "New" }, { id: "b", ...lead(other), status: "New" }, { id: "shared", ...lead(other), name: "Shared lead", assigned_user_ids: [other, sales], status: "New" }],
+    sales_followups: [...[sales, other].map((id) => ({ id, user_id: id, status: "Pending", due_at: time, lead: lead(id) })), { id: "shared", user_id: other, status: "Pending", due_at: time, lead: { ...lead(sales), assigned_to: other, assigned_user_ids: [other, sales] } }],
+    sales_meetings: [...[sales, other].map((id) => ({ id, assigned_to: id, status: "Scheduled", starts_at: time, lead: lead(id) })), { id: "shared", assigned_to: other, status: "Scheduled", starts_at: time, lead: { ...lead(sales), assigned_to: other, assigned_user_ids: [other, sales] } }],
     client_meeting_reminders: [sales, other].map((id) => ({ id, user_id: id, status: "Pending", reminder_at: time })),
     operation_eod_reports: [{ id: "mine", created_by: sales, operation_hidden_at: null }, { id: "private", created_by: other, operation_hidden_at: null }],
   };
@@ -116,9 +119,10 @@ test("sales dashboard scopes all data to the logged-in user, even for admins", a
     const route = await load("src/app/api/sales/dashboard/route.js", mocks(ctx));
     const response = await route.GET(new Request("https://crm.test/api/sales/dashboard?user_id=" + other));
     assert.equal(response.status, 200);
-    assert.equal(response.data.metrics.my_leads, 1);
+    assert.equal(response.data.metrics.my_leads, 2);
     assert.equal(response.data.metrics.assigned_tasks, 1);
-    assert.equal(response.data.metrics.pending_followups, 1);
+    assert.equal(response.data.metrics.pending_followups, 2);
+    assert.equal(response.data.metrics.upcoming_meetings, 2);
     assert.equal(response.data.metrics.self_reminders, 1);
     assert.equal(response.data.metrics.historical_eod_reports, 1);
     assert.ok(!JSON.stringify(response.data).includes("Private"));

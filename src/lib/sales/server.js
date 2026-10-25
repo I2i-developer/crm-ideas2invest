@@ -17,7 +17,7 @@ export async function salesContext(request) {
 
 export function salesError(error) {
   const message = String(error?.message || error || "Sales request failed");
-  if (message.includes("schema cache") || message.includes("does not exist")) return salesJson({ error: "Sales setup is pending. Apply the sales workspace and sales sources migrations in Supabase." }, 503);
+  if (message.includes("schema cache") || message.includes("does not exist")) return salesJson({ error: "Sales setup is pending. Apply the sales migrations through 202610250003_sales_calling_refinements.sql in Supabase." }, 503);
   if (error?.code === "23505") return salesJson({ error: "A lead with this phone already exists" }, 409);
   if (message.includes("changed since") || message.includes("conflict") || message.includes("already scheduled")) return salesJson({ error: message }, 409);
   return salesJson({ error: message }, error?.code === "42501" ? 403 : 400);
@@ -25,7 +25,7 @@ export function salesError(error) {
 
 export async function getSalesLead(context, id) {
   let q = context.db.from("sales_leads").select("*").eq("id", id);
-  if (context.role !== "admin") q = q.eq("assigned_to", context.user.id);
+  if (context.role !== "admin") q = q.contains("assigned_user_ids", [context.user.id]);
   const { data, error } = await q.maybeSingle();
   if (error) throw error;
   return data;

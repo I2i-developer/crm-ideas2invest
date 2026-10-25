@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, isAdmin, canUseSharedTools } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 
 export async function GET(request) {
   try {
     const supabase = await createClient(request);
-    const { user } = await getAuthContext(supabase);
+    const { user, role } = await getAuthContext(supabase);
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!canUseSharedTools(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const readClient = getTaskDataClient(supabase);
     const { data, error } = await readClient

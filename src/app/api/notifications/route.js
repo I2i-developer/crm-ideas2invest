@@ -6,6 +6,7 @@ import { generateTaskDateNotifications } from "@/lib/tasks/alerts";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
 import { generateDueSelfReminderNotifications } from "@/lib/reminders/selfReminders";
 import { dispatchSalesReminders } from "@/lib/sales/notifications";
+import { canReceiveNotification, SALES_NOTIFICATION_FILTER } from "@/lib/notifications/audience";
 
 async function generateBirthdayNotifications(request, supabase, userId) {
   const response = await fetch(new URL("/api/birthdays?days=1", request.url), {
@@ -82,15 +83,17 @@ export async function GET(request) {
     catch (error) { console.error("Sales reminder dispatch:", error.message); }
   }
   await generateTaskDateNotifications(supabase, user.id);
-  await generateBirthdayNotifications(request, supabase, user.id);
-  await generateKycStatusReminder(supabase, user.id);
+  if (role === "admin" || role === "operations") {
+    await generateBirthdayNotifications(request, supabase, user.id);
+    await generateKycStatusReminder(supabase, user.id);
+  }
   await generateDueSelfReminderNotifications(supabase, user.id);
 
   let notificationsQuery = notificationDb
     .from("task_notifications")
     .select("*")
     .eq("user_id", user.id)
-    .or("notification_type.is.null,notification_type.neq.upcoming_birthday")
+    .or(role === "sales" ? SALES_NOTIFICATION_FILTER : "notification_type.is.null,notification_type.neq.upcoming_birthday")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -108,17 +111,17 @@ export async function GET(request) {
 
   const { data: unreadRows, error: unreadError } = await notificationDb
     .from("task_notifications")
-    .select("id, notification_type, entity_type, link_url")
+    .select("id, notification_type, entity_type, link_url, task_id")
     .eq("user_id", user.id)
-    .or("notification_type.is.null,notification_type.neq.upcoming_birthday")
+    .or(role === "sales" ? SALES_NOTIFICATION_FILTER : "notification_type.is.null,notification_type.neq.upcoming_birthday")
     .eq("is_read", false);
 
   if (unreadError) {
     return NextResponse.json({ error: unreadError.message }, { status: 500 });
   }
 
-  const visibleNotifications = (notifications || []).filter((notification) => !isRetiredInsuranceNotification(notification));
-  const unreadCount = (unreadRows || []).filter((notification) => !isRetiredInsuranceNotification(notification)).length;
+  const visibleNotifications = (notifications || []).filter((notification) => canReceiveNotification(role, notification) && !isRetiredInsuranceNotification(notification));
+  const unreadCount = (unreadRows || []).filter((notification) => canReceiveNotification(role, notification) && !isRetiredInsuranceNotification(notification)).length;
 
   return NextResponse.json({ notifications: visibleNotifications, unread_count: unreadCount }, { status: 200 });
 }

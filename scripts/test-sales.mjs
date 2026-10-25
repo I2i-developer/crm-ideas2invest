@@ -30,6 +30,19 @@ test("validates mandatory contacts and imported statuses", () => {
   assert.equal(r.normalizeStatus("custom invalid"), "");
 });
 
+test("multiple phone numbers stay on one lead, normalize individually and detect secondary duplicates", () => {
+  const lead = r.validateLead({ name: "Md. Zakir", phone: "9958418133; 9871909182; 9910484412" });
+  assert.deepEqual(lead.phone_keys, ["+919958418133", "+919871909182", "+919910484412"]);
+  assert.equal(lead.phone_key, "+919958418133");
+  assert.equal(lead.phone, "9958418133; 9871909182; 9910484412");
+  for (const separator of [";", ",", "/", "|", "\n"]) assert.equal(r.phoneNumbers(`9958418133${separator}9871909182`).length, 2);
+  assert.equal(r.phoneNumbers("9958418133; +91 99584 18133").length, 1);
+  assert.throws(() => r.validateLead({ name: "Bad", phone: "9958418133; invalid" }), /valid phone numbers/);
+  const rows = r.prepareImport([["Name", "Phone"], ["First", "9958418133; 9871909182"], ["Overlap", "9910484412; +91 98719 09182"], ["Unique", "9910484412"]]);
+  assert.deepEqual(rows.map((row) => row.valid), [true, false, true]);
+  assert.match(rows[1].error, /Duplicate phone/);
+});
+
 test("calling sheet imports recognize heading aliases, duplicate phones, and original done-by", () => {
   const rows = r.prepareImport([["Calling sheet"], ["Name/Entity", "Phone", "Email Address", "Status", "Remark", "Done by"],
     ["Company A", "9876543210", "", "RNR-1", "Call tomorrow", "Original caller"],
@@ -88,7 +101,8 @@ test("sales page routing preserves admin/operations access and blocks sales from
     return module.namespace.middleware({ nextUrl: { pathname }, url: "https://crm.test" + pathname, cookies: { get() {} } });
   }
   for (const path of ["/sales", "/sales/dashboard", "/sales/eod-history", "/admin/meeting-notes", "/admin/settings", "/admin/reminders", "/admin/calculators", "/admin/document-requirements", "/admin/document-requirements/nri", "/notifications", "/dashboard/tasks", "/dashboard/tasks/assigned-task"]) assert.equal((await route("sales", path)).kind, "next");
-  for (const path of ["/admin/clients", "/admin/company", "/dashboard/tasks/create", "/dashboard/tasks/assigned-task/edit", "/operations/dashboard", "/system-gate"]) assert.equal((await route("sales", path)).path, "/sales/dashboard");
+  assert.equal((await route("sales", "/admin/company")).kind, "next");
+  for (const path of ["/admin/clients", "/admin/company/credentials", "/dashboard/tasks/create", "/dashboard/tasks/assigned-task/edit", "/operations/dashboard", "/system-gate"]) assert.equal((await route("sales", path)).path, "/sales/dashboard");
   assert.equal((await route("operations", "/sales")).path, "/operations/dashboard");
   assert.equal((await route("operations", "/dashboard/tasks")).kind, "next");
   assert.equal((await route("admin", "/sales")).kind, "next");

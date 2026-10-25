@@ -1,4 +1,6 @@
 import { sendWebPushForNotification } from "@/lib/webPush/server";
+import { getTaskDataClient } from "@/lib/tasks/assignees";
+import { canDeliverNotification } from "@/lib/notifications/audience";
 
 export async function createNotification(
   supabase,
@@ -29,6 +31,8 @@ export async function createNotification(
     metadata,
     dedupe_key: dedupeKey,
   };
+
+  if (!await canDeliverNotification(getTaskDataClient(supabase), payload)) return null;
 
   const { data, error } = await supabase
     .from("task_notifications")

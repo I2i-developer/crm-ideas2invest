@@ -35,6 +35,14 @@ src/lib/google/vision-key.json
 !/supabase/migrations/202610240003_sales_sources.sql
 !/supabase/migrations/202610240004_sales_tools_addresses.sql
 !/supabase/migrations/202610240005_sales_eod_parity.sql
+!/supabase/migrations/202610240006_sales_shared_imports.sql
+!/supabase/migrations/202610240007_sales_import_10000.sql
+!/supabase/migrations/202610240008_sales_multiple_phones.sql
+!/supabase/migrations/202610240009_sales_bulk_delete.sql
+!/supabase/migrations/202610250001_sales_calling_columns.sql
+!/supabase/migrations/202610250002_sales_calling_workspace.sql
+!/supabase/migrations/202610250003_sales_calling_refinements.sql
+!/supabase/migrations/202610250004_sales_quick_notes.sql
 /CRM_PRD.md
 /Updated DOB.xlsx
 /AMC'S FORM.xlsx

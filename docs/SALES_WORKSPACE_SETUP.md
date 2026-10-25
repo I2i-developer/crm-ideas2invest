@@ -16,6 +16,25 @@ from the sidebar. Operations access is unchanged.
    the optional editable lead address and read access to a Sales user's own
    historical Operations EOD reports. It does not change account roles or work
    records.
+   For shared calling-sheet assignments and Sales imports, run
+   `supabase/migrations/202610240006_sales_shared_imports.sql` after migration 004.
+   It retains existing owners/IDs and backfills each existing lead's shared list
+   with its current owner. Run it before deploying these import/access changes.
+   Migration 005 remains required separately for Sales EOD review replies.
+   Next run `supabase/migrations/202610240007_sales_import_10000.sql` to raise the
+   database import limit to 10,000 leads. It only replaces the import function;
+   no existing rows are modified.
+   Then run `supabase/migrations/202610240008_sales_multiple_phones.sql` for
+   multiple phone numbers on one lead. This adds a phone registry, backfills
+   existing primary numbers and updates validation triggers/search. It does not
+   change existing lead IDs, assignments, timelines, tasks or EOD records.
+   Run `supabase/migrations/202610240009_sales_bulk_delete.sql` for admin-only
+   selected/source-wide deletion. Installing it does not remove any records.
+   Run `supabase/migrations/202610250001_sales_calling_columns.sql` for the
+   read-only first-work attribution used by Done by. It does not rewrite history.
+   Run `supabase/migrations/202610250002_sales_calling_workspace.sql` for personal
+   bookmarks, last-call resume and source-wide chart aggregates. No new npm
+   dependencies are needed. Existing clients, leads, tasks and activity are kept.
 2. Deploy the code and run `npm ci` on other environments. The new runtime
    dependency is `chrono-node` (already installed in this workspace).
 3. Use the existing admin user-provisioning screen to create Sales accounts or
@@ -37,25 +56,30 @@ The application does not run migrations automatically.
 ## Calling Sheet
 
 Select a source before opening its calling queue, follow-ups, meetings or EOD.
-There is no combined lead list. Admins can use Import sheet > New source to
-create a named category, or select a source and use Add data to append another
+There is no combined lead list. Admins and Sales can use Import sheet > New source to
+create a named category, or select a source and use Import sheet to append another
 file. Existing source names are case/whitespace-insensitive and cannot be
 duplicated. Each import batch retains its filename and source link.
+Import sheet is the single import action; Existing source appends another file.
+The empty system Manual source is hidden, not deleted. Manual sources with real
+leads remain visible to avoid hiding existing work.
 
 Legacy imports are grouped by their original filename; legacy manual leads
 retain their source label (normally Manual). Source selection is retained in
 the page URL. Clearing other filters does not clear the selected source.
 Manually added leads also require a source. Sales accounts see only sources
-containing their assigned leads, plus Manual, and only their own source counts.
+containing their assigned/shared leads, their own created sources, plus Manual,
+and only their own accessible lead counts. Creating a source does not grant
+access to leads later assigned exclusively to other users.
 
-Import Excel (.xlsx/.xls) or CSV through the admin Import Sheet button.
+Import Excel (.xlsx/.xls) or CSV through the Admin or Sales Import Sheet button.
 The first worksheet is selected initially; other worksheets can be selected.
 The header must appear within the first 25 rows.
 
 | Column | Requirement |
 | --- | --- |
 | Name/Entity | Required; maximum 180 characters |
-| Phone | Required; one number per row; include country code outside India |
+| Phone | Required; one or more numbers separated by semicolons, commas, slashes, pipes or new lines; include country codes outside India |
 | Email Address | Optional; valid email if supplied |
 | Status | Optional; defaults to New; unknown statuses are rejected |
 | Remark | Optional; stored as an import timeline entry |
@@ -66,13 +90,26 @@ The preview rejects repeated phone numbers within the file and numbers already
 in CRM, including archived leads. Indian formats with +91, 0 prefix, spaces and
 dashes normalize to one identity. Shared family/company numbers need deliberate
 review before import. Imports do not overwrite existing contacts.
+Multiple numbers in one cell stay on one lead; the first is the primary number.
+Repeated formats of the same number inside that cell are collapsed. All numbers
+are validated, searchable and available as separate call links in the lead details.
+If any number overlaps another lead/file row, the row remains rejected under the
+existing duplicate rule; numbers are not silently dropped or merged into other leads.
 Duplicate checks span all sources: a repeated phone is rejected, not moved into
 the new source. Appending keeps existing owners, statuses, remarks and reminders
-unchanged. Only newly accepted leads receive the selected import owner.
+unchanged. Only newly accepted leads receive the selected shared assignees.
 
-Up to 5000 leads / 10 MB may be imported at once. Only valid preview rows are
-saved; uniqueness is rechecked transactionally at save time. Choose an owner
-or leave the new leads unassigned for later admin assignment.
+Up to 10,000 leads / 10 MB may be imported at once. Only valid preview rows are
+saved; uniqueness is rechecked transactionally at save time. Select multiple
+active Sales/Admin users: every selected user has access to every accepted lead,
+not a split of the file. One lead/status/timeline is shared, not copied. The first
+selected user is the meeting coordinator (keeps the legacy single-owner field).
+Sales defaults to the importer; Admin can leave leads unassigned. Empty Sales
+assignments submitted directly to the API also default to the importer. Operations
+and inactive users cannot be selected. Imports cannot reassign existing leads.
+Admins can later change the full shared list in Manage lead. Scheduled meetings
+must be cancelled before any assignment change. A legacy single-owner update
+replaces the shared list with that owner, rather than leaving stale access behind.
 
 Original Done by text never grants access or determines ownership. New activity
 uses the authenticated user's identity. Imported historical statuses do not
@@ -81,7 +118,61 @@ to set those dates.
 
 ## Workflow and Reporting
 
-- Sales users can view and log activity only for their assigned leads.
+### Deleting Imported Leads
+
+Only active Admins can select and permanently delete imported leads, regardless
+of whether an Admin or Sales user imported them. Select page selects only the
+current page's imported leads; selection persists across pages and resets when
+filters/source change. Delete all imported covers the entire selected source,
+including archived imports and leads outside the current table filters. Manually
+added leads, the source and historical import batch records are retained.
+
+Deletion requires a preview and typed confirmation (DELETE for a selection, or
+the source name for all imports). The database checks a fingerprint of the
+confirmed IDs, rejecting stale selections rather than deleting unexpected leads.
+Both API and database independently enforce Admin access; Sales has no controls.
+Calls/remarks, lead meetings, follow-ups, phone registrations and lead notifications
+are permanently removed; calculated call/EOD totals change accordingly. Saved
+Meeting Notes, submitted manual EOD reports, tasks, clients and other sources are
+not deleted. The same database transaction writes an audit log; audit failure
+rolls back the deletion. No deletion is run automatically on deployment.
+
+### Daily Workflow
+
+Bookmarks are personal to the authenticated user, with one saved lead per source.
+Mark/unmark from a row or lead details. Open bookmark clears table filters,
+locates the correct queue page and highlights the row without opening details.
+Resume last call opens details for the latest successful call recorded by that user in that source,
+including calls made before this migration. Imported rows, notes alone and
+failed activity saves do not move last-call progress. Archive, reassignment or
+deletion makes an inaccessible checkpoint unavailable; users cannot access
+another user's bookmarks. Bookmarking never changes Done by or lead activity.
+
+The last selected available source is remembered per user on that browser; no
+lead names or phone numbers are stored in this device preference.
+Calling overview uses source-wide aggregates rather than the 50-row table page.
+Lead status counts active accessible leads; Calling activity stacks connected
+and unconnected actual calls over seven India-time days. Sales sees only their
+own calling activity and accessible leads; Admin sees the source's team totals.
+The overview can be collapsed to keep the calling queue in view. Tool actions
+use CrmTooltip rather than native HTML title attributes.
+
+The calling queue shows Name/Entity, Phone Number (with a separate copy button
+for each number), Address, Status/Follow-up, Latest Remark, Done by and actions.
+Done by is the earliest actual CRM worker, not the importer or current assignee.
+Import and assignment entries and the automatic initial "Lead added" placeholder
+do not count. Calls, remarks, meeting actions, address/contact edits and reminder
+changes count. A user-provided initial remark on manual creation also counts.
+Later work by another user updates Latest Remark without replacing Done by.
+Untouched leads show a dash. Full actor/import provenance remains in the timeline.
+
+- Sales users can view and log activity only for their assigned/shared leads.
+  Shared leads, their calendar, pending follow-ups and meeting notes are visible
+  to all assignees. The meeting coordinator remains responsible for bookings and
+  overlap checks; shared access does not make every assignee a meeting attendee.
+  Due reminders notify all active assignees, once per user per reminder time.
+  Concurrent activity uses the existing version checks to prevent overwrites.
+  Meeting-note edit/finalization permissions remain unchanged.
 - Sales have a personal dashboard, Self Reminders, Calculators and Required Docs.
   Every dashboard query is scoped to the logged-in user's ID; the layout follows
   the Operations dashboard without exposing Operations-wide client/SIP data.
@@ -133,6 +224,32 @@ a screenshot-prevention guarantee. Managed devices are needed for enforceable
 device-level capture restrictions.
 
 ## Verification
+
+### Calling Desk Refinements
+
+Apply `202610250004_sales_quick_notes.sql` after the preceding migrations to
+enable own-note Quick Notes access for Sales. Existing notes and Operations/Admin
+policies remain unchanged. No npm packages are required.
+
+Sales notification history, unread badges, realtime toasts and web push exclude
+back-office categories. Birthday/KYC generation no longer runs for Sales;
+tasks, chat, personal reminders and sales follow-ups remain available. Existing
+notification records are retained, not deleted. The legacy task-notifications
+URL uses the same role-aware API.
+
+Apply `202610250003_sales_calling_refinements.sql` after the earlier Sales
+migrations. It updates bookmark positions for 50-row queue pages and adds
+read-only Sales access to company details. It does not delete or rewrite leads,
+activities, EOD reports, or saved bookmarks. No npm packages are required.
+
+Only the saved bookmark button remains visible within its source; remove it
+before choosing another lead. Open bookmark resets table filters and navigates
+to its current page, scrolls to the row and highlights it without opening the
+lead dialog. Bookmarks remain personal and source-specific.
+
+The Sales dashboard shares the source-scoped calling overview charts with the
+Calling Desk. Sales can open Company from the sidebar but cannot access the
+credential section or its API. Operations/Admin credential access is unchanged.
 
 For the explicitly requested Jalaj/Rajat role changes, the guarded script is
 `node scripts/change-sales-roles.mjs` (read-only preflight). Add `--apply` only

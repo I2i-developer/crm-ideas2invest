@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { getTaskDataClient } from "@/lib/tasks/assignees";
+import { canDeliverNotification } from "@/lib/notifications/audience";
 
 let configured = false;
 
@@ -67,10 +68,11 @@ export async function sendWebPushForNotification(supabase, notification) {
   };
 
   if (!notification?.user_id) return result;
+  const db = getTaskDataClient(supabase);
+  if (!await canDeliverNotification(db, notification)) return result;
   if (!configureWebPush()) return result;
   result.configured = true;
 
-  const db = getTaskDataClient(supabase);
   const { data: subscriptions, error } = await db
     .from("web_push_subscriptions")
     .select("id, endpoint, p256dh, auth, failure_count")

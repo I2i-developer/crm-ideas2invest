@@ -40,7 +40,7 @@ export default function FormSelect({
     ),
   ];
   const selectedOption = isMulti
-    ? normalizedOptions.filter((option) => (value || []).map(String).includes(String(option.value)))
+    ? (value || []).map((item) => normalizedOptions.find((option) => String(option.value) === String(item))).filter(Boolean)
     : normalizedOptions.find((option) => String(option.value) === String(value ?? "")) || null;
 
   return (
@@ -56,6 +56,7 @@ export default function FormSelect({
         </label>
       )}
       <Select
+        inputId={name}
         name={name}
         options={normalizedOptions}
         placeholder={placeholder}

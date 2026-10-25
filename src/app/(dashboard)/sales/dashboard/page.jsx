@@ -6,6 +6,7 @@ import { AlertTriangle, BellRing, CalendarClock, CalendarDays, ClipboardList, Hi
 import PageHeader from "@/components/PageHeader";
 import BrandLoader from "@/components/BrandLoader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import DashboardCallingOverview from "../DashboardCallingOverview";
 import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
@@ -59,6 +60,7 @@ export default function SalesDashboard() {
     {error && <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{CARDS.map(([key, label, Icon, tone, href]) => <Link href={href} key={key} className="glass-card flex min-h-[104px] min-w-0 items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md"><span className={`shrink-0 rounded-xl p-3 ${TONES[tone]}`}><Icon size={21} /></span><div className="min-w-0"><p className="text-xs text-gray-500">{label}</p><p className="text-[26px] font-semibold leading-tight">{data?.metrics[key] || 0}</p></div></Link>)}</div>
     <DashboardCharts data={data} mode="sales" />
+    <DashboardCallingOverview refreshToken={data} />
     <div className="grid gap-5 xl:grid-cols-2">
       <WorkList title="Recently Assigned Tasks" rows={data?.recent_tasks} empty="No assigned tasks." render={(task) => <Link key={task.id} className={itemClass} href={`/dashboard/tasks/${task.id}`}><p className="font-semibold">{task.title}</p><p className="text-xs text-gray-500">{task.status}</p></Link>} />
       <WorkList title="Upcoming Follow-ups" rows={data?.followups} empty="No pending follow-ups." render={(row) => <Link key={row.id} className={itemClass} href={leadLink(row, "followups")}><p className="font-semibold">{row.lead.name}</p><p className="text-xs text-gray-500">{row.title} / {formatDateTimeDDMonYYYY(row.due_at)}</p></Link>} />

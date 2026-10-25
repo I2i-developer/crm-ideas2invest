@@ -18,6 +18,7 @@ export async function GET(request) {
     const { user, role } = await getAuthContext(supabase);
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { data, error } = await supabase
       .from("company_credentials")

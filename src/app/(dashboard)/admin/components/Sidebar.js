@@ -307,7 +307,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
     { name: "Company", path: "/admin/company", icon: null, companyLogo: true },
     { name: "Audit", path: "/admin/audit", icon: ShieldCheck, adminOnly: true },
   ].filter((item) => {
-      if (userData.role === "sales") return ["Dashboard", "Calling Desk", "Tasks", "Meeting Notes", "Self Reminders", "Calculators", "Required Docs", "EOD Reports"].includes(item.name);
+      if (userData.role === "sales") return ["Dashboard", "Calling Desk", "Tasks", "Meeting Notes", "Self Reminders", "Calculators", "Required Docs", "EOD Reports", "Company"].includes(item.name);
     if (item.salesOnly) return false;
     if (item.adminOnly && userData.role !== "admin") return false;
     if (item.operationsOnly && userData.role !== "operations") return false;
@@ -394,12 +394,12 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, s
                 }`}
               >
                 {item.companyLogo ? (
-                  <span className={`relative shrink-0 ${collapsed ? "h-8 w-12" : "h-8 w-24"}`}>
+                  <span className={`relative shrink-0 ${collapsed ? "h-10 w-12" : "h-12 w-36"}`}>
                     <Image
                       src="/images/logo/logo.png"
                       alt="Company"
                       fill
-                      sizes={collapsed ? "48px" : "96px"}
+                      sizes={collapsed ? "48px" : "144px"}
                       className="object-contain"
                     />
                   </span>

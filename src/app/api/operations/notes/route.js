@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
+import { getAuthContext, canUseSharedTools } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 
 function notePayload(body) {
@@ -19,7 +19,7 @@ export async function GET(request) {
   const { user, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canUseSharedTools(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const query = supabase
     .from("operation_notes")
@@ -27,6 +27,7 @@ export async function GET(request) {
     .eq("archived", false)
     .order("pinned", { ascending: false })
     .order("updated_at", { ascending: false });
+  if (role === "sales") query.eq("created_by", user.id);
 
   const { data: notes, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -54,8 +55,8 @@ export async function POST(request) {
   const { user, profile, role } = await getAuthContext(supabase);
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdmin(role) && !isOperations(role)) {
-    return NextResponse.json({ error: "Only CRM admin and operations users can create quick notes" }, { status: 403 });
+  if (!canUseSharedTools(role)) {
+    return NextResponse.json({ error: "Only CRM team members can create quick notes" }, { status: 403 });
   }
 
   const payload = notePayload(await request.json());

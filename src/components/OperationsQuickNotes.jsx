@@ -43,7 +43,7 @@ export default function OperationsQuickNotes({ role }) {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const visible = role === "operations" || role === "admin";
+  const visible = ["operations", "admin", "sales"].includes(role);
   const activeNote = notes.find((note) => note.id === activeNoteId) || null;
   const canManageNote = useCallback(
     (note) => role === "admin" || note?.created_by === currentUserId,
@@ -204,7 +204,7 @@ export default function OperationsQuickNotes({ role }) {
         <>
           <button
             type="button"
-            aria-label="Close quick notes"
+            aria-label="Dismiss quick notes"
             className="fixed inset-0 z-40 cursor-default bg-transparent"
             onClick={closePanel}
           />
@@ -231,7 +231,7 @@ export default function OperationsQuickNotes({ role }) {
                       <Plus size={15} /> New note
                     </button>
                   )}
-                  <button type="button" onClick={closePanel} className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white hover:text-slate-900">
+                  <button type="button" onClick={closePanel} aria-label="Close quick notes" className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white hover:text-slate-900">
                     <X size={17} />
                   </button>
                 </div>
@@ -318,7 +318,7 @@ export default function OperationsQuickNotes({ role }) {
                       )}
                     </div>
                   </div>
-                  <div className="mt-5 whitespace-pre-wrap rounded-2xl border border-amber-100 bg-amber-50/50 p-5 text-sm leading-7 text-slate-700">
+                  <div className="mt-5 whitespace-pre-wrap rounded-2xl border border-amber-100 bg-amber-50/50 p-5 text-sm leading-7 text-slate-700 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-200">
                     {activeNote.content}
                   </div>
                 </div>

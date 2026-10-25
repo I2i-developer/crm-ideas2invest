@@ -21,7 +21,7 @@ export default function PageHeader({
   };
 
   return (
-    <header className={`relative overflow-hidden rounded-2xl border sm:rounded-3xl ${tones[tone] || tones.default} ${compact ? "p-4 sm:p-5" : "p-4 sm:p-7"} shadow-[0_18px_45px_rgba(15,23,42,0.08)]`}>
+    <header className={`relative overflow-hidden rounded-2xl border sm:rounded-3xl ${tones[tone] || tones.default} ${compact ? "p-4 sm:p-5" : "p-4 sm:p-7"} shadow-[0_2px_6px_rgba(15,23,42,0.04)]`}>
       <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-5">
         <div className="min-w-0">
           {eyebrow && (

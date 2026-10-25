@@ -1,5 +1,5 @@
 import { salesContext, salesJson, salesError, getSalesLead } from "@/lib/sales/server";
-import { UUID_RE, validateLead } from "@/lib/sales/rules";
+import { UUID_RE, validateLead, validateAssignees } from "@/lib/sales/rules";
 import { writeAuditLog } from "@/lib/audit/logger";
 export const dynamic = "force-dynamic";
 
@@ -18,11 +18,11 @@ export async function GET(request, { params }) {
       ctx.db.from("sales_followups").select("*").eq("lead_id", id).eq("status", "Pending").order("due_at"),
     ]);
     for (const result of [events, meetings, reminders]) if (result.error) throw result.error;
-    const ids = [...new Set([lead.assigned_to, ...(events.data || []).map((a) => a.actor_id)].filter(Boolean))];
+    const ids = [...new Set([...(lead.assigned_user_ids || []), lead.assigned_to, ...(events.data || []).map((a) => a.actor_id)].filter(Boolean))];
     const { data: profiles, error: profileError } = ids.length ? await ctx.db.from("profiles").select("id,name,full_name,email").in("id", ids) : { data: [] };
     if (profileError) throw profileError;
     const names = new Map((profiles || []).map((p) => [p.id, p.name || p.full_name || p.email || "Sales user"]));
-    return salesJson({ lead: { ...lead, assigned_name: names.get(lead.assigned_to) || "Unassigned" },
+    return salesJson({ lead: { ...lead, assigned_name: names.get(lead.assigned_to) || "Unassigned", assigned_names: (lead.assigned_user_ids || []).map((uid) => names.get(uid) || "Sales user") },
       activities: (events.data || []).map((a) => ({ ...a, done_by: names.get(a.actor_id) || "Sales user" })),
       activity_total: events.count, meetings: meetings.data, followups: reminders.data });
   } catch (error) { return salesError(error); }
@@ -39,7 +39,8 @@ export async function PATCH(request, { params }) {
     const existing = await getSalesLead(ctx, id);
     if (!existing) return salesJson({ error: "Lead not found" }, 404);
     const fields = validateLead({ ...existing, ...body });
-    const { data, error } = await ctx.supabase.rpc("sales_update_lead", { p_id: id, p: { ...body, ...fields } });
+    const users = validateAssignees(body.assigned_user_ids ?? (body.assigned_to !== undefined ? (body.assigned_to ? [body.assigned_to] : []) : existing.assigned_user_ids || []));
+    const { data, error } = await ctx.supabase.rpc("sales_update_shared_lead", { p_id: id, p: { ...body, ...fields }, p_users: users });
     if (error) throw error;
     await writeAuditLog(ctx.supabase, { actor: ctx.user, profile: ctx.profile, action: "sales_lead_updated", entityType: "sales_lead", entityId: id, request });
     return salesJson({ lead: data });

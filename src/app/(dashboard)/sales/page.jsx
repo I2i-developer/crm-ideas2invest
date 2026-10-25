@@ -3,13 +3,15 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { CalendarDays, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, FileText, FolderOpen, History, Loader2, MapPin, MessageSquarePlus, Pencil, Phone, PhoneCall, Plus, RefreshCw, Save, Search, ShieldCheck, Upload, UserRound, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, CalendarDays, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, FileText, FolderOpen, History, Loader2, MapPin, MessageSquarePlus, Pencil, Phone, PhoneCall, Plus, RefreshCw, Save, Search, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import PageHeader from "@/components/PageHeader";
+import CrmTooltip from "@/components/CrmTooltip";
+import SalesInsights from "./SalesInsights";
 import FormInput from "@/app/(dashboard)/admin/clients/components/FormInput";
 import FormSelect from "@/app/(dashboard)/admin/clients/components/FormSelect";
-import { SALES_STATUSES, CALL_STATUSES, FOLLOWUP_STATUSES, istDate, toIstInput, fromIstInput, suggestedFollowup } from "@/lib/sales/rules";
+import { SALES_STATUSES, SALES_PAGE_SIZE, CALL_STATUSES, FOLLOWUP_STATUSES, istDate, toIstInput, fromIstInput, suggestedFollowup, phoneNumbers } from "@/lib/sales/rules";
 import styles from "./sales.module.css";
 
 const VIEWS = [{ id: "leads", label: "Calling Queue", icon: PhoneCall }, { id: "followups", label: "Follow-ups", icon: CalendarClock }, { id: "calendar", label: "Meetings", icon: CalendarDays }, { id: "eod", label: "Daily EOD", icon: ClipboardList }];
@@ -28,6 +30,26 @@ async function api(path, options = {}) {
   return data;
 }
 
+function TipButton({ tooltip, side = "top", children, ...props }) {
+  return <CrmTooltip content={tooltip} side={side}><button {...props}>{children}</button></CrmTooltip>;
+}
+
+function LeadPhones({ value }) {
+  const [copied, setCopied] = useState("");
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  async function copy(number) {
+    try {
+      await navigator.clipboard.writeText(number.phone);
+      setCopied(number.key); clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(""), 2000);
+    } catch { toast.error("Unable to copy. Please check browser clipboard permissions."); }
+  }
+  return <div className={styles.phoneList}>{phoneNumbers(value).map((number) => <div className={styles.phoneNumber} key={number.key}>
+    <span>{number.phone}</span><TipButton type="button" className={`${styles.iconButton} ${styles.phoneCopy} ${styles.copyAction}`} onClick={() => copy(number)} tooltip={copied === number.key ? "Copied" : "Copy phone number"} aria-label={`Copy phone number ${number.phone}`}>{copied === number.key ? <Check size={14} /> : <Copy size={14} />}</TipButton>
+  </div>)}</div>;
+}
+
 function Status({ value }) {
   const tone = ["Converted", "Meeting Completed"].includes(value) ? styles.positive : ["Not Interested", "Do Not Call", "Wrong Number"].includes(value) ? styles.negative : value?.startsWith("RNR") || ["Call Busy", "Switched off"].includes(value) ? styles.warning : styles.information;
   return <span className={`${styles.status} ${tone}`}>{value}</span>;
@@ -42,6 +64,7 @@ function Dialog({ title, onClose, wide = false, children }) {
     const previous = document.activeElement;
     ref.current?.querySelector("button, input, textarea, select")?.focus();
     const keydown = (e) => {
+      if (e.defaultPrevented) return;
       if ([...document.querySelectorAll("[data-sales-dialog]")].at(-1) !== ref.current) return;
       if (e.key === "Escape") { e.stopPropagation(); closeRef.current(); }
       if (e.key === "Tab") {
@@ -63,11 +86,11 @@ function Dialog({ title, onClose, wide = false, children }) {
     </div>, document.body);
 }
 
-function Pager({ page, total, onChange }) {
+function Pager({ page, total, onChange, pageSize = 25 }) {
   return <div className={styles.pager}>
-    <span>{total ? `${(page - 1) * 25 + 1}-${Math.min(page * 25, total)} of ${total}` : "0 records"}</span>
+    <span>{total ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}` : "0 records"}</span>
     <button className={styles.iconButton} disabled={page <= 1} onClick={() => onChange(page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></button>
-    <button className={styles.iconButton} disabled={page * 25 >= total} onClick={() => onChange(page + 1)} aria-label="Next page"><ChevronRight size={16} /></button>
+    <button className={styles.iconButton} disabled={page * pageSize >= total} onClick={() => onChange(page + 1)} aria-label="Next page"><ChevronRight size={16} /></button>
   </div>;
 }
 
@@ -81,8 +104,8 @@ function LeadAddress({ lead, editable = true, onSaved }) {
       setEditing(false); onSaved(data.lead); toast.success("Address saved");
     } catch (e) { toast.error(e.message); } finally { setSaving(false); }
   }
-  if (!editing) return <button type="button" title={editable ? "Edit address" : "Address"} className={styles.addressButton} disabled={!editable} onClick={() => { setValue(lead.address || ""); setVersion(lead.version); setEditing(true); }}><MapPin size={14} /><span className={styles.addressText}>{lead.address || "Add address"}</span>{editable && <Pencil size={12} />}</button>;
-  return <div className={styles.addressEditor}><textarea aria-label={`Address for ${lead.name}`} value={value} maxLength={1000} rows={3} disabled={saving} onChange={(e) => setValue(e.target.value)} /><div className={styles.actions}><button type="button" className={styles.iconButton} title="Save address" aria-label="Save address" disabled={saving} onClick={save}>{saving ? <Loader2 size={15} className={styles.spinner} /> : <Save size={15} />}</button><button type="button" className={styles.iconButton} title="Cancel address edit" aria-label="Cancel address edit" disabled={saving} onClick={() => setEditing(false)}><X size={15} /></button></div></div>;
+  if (!editing) return <CrmTooltip content={editable ? "Edit address" : "Address"} className={styles.addressTip}><button type="button" aria-label={editable ? "Edit address" : "Address"} className={styles.addressButton} disabled={!editable} onClick={() => { setValue(lead.address || ""); setVersion(lead.version); setEditing(true); }}><MapPin size={14} /><span className={styles.addressText}>{lead.address || "Add address"}</span>{editable && <Pencil size={12} />}</button></CrmTooltip>;
+  return <div className={styles.addressEditor}><textarea aria-label={`Address for ${lead.name}`} value={value} maxLength={1000} rows={3} disabled={saving} onChange={(e) => setValue(e.target.value)} /><div className={styles.actions}><TipButton type="button" className={styles.iconButton} tooltip="Save address" aria-label="Save address" disabled={saving} onClick={save}>{saving ? <Loader2 size={15} className={styles.spinner} /> : <Save size={15} />}</TipButton><TipButton type="button" className={styles.iconButton} tooltip="Cancel address edit" aria-label="Cancel address edit" disabled={saving} onClick={() => setEditing(false)}><X size={15} /></TipButton></div></div>;
 }
 
 export default function SalesWorkspace() {
@@ -93,6 +116,8 @@ export default function SalesWorkspace() {
   const [sourceError, setSourceError] = useState("");
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [highlightLeadId, setHighlightLeadId] = useState(null);
+  const [pendingBookmark, setPendingBookmark] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -102,6 +127,8 @@ export default function SalesWorkspace() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [activityKind, setActivityKind] = useState(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [eodDate, setEodDate] = useState(istDate());
@@ -113,12 +140,80 @@ export default function SalesWorkspace() {
   const [snooze, setSnooze] = useState(null);
   const [busy, setBusy] = useState(false);
   const [viewedAt, setViewedAt] = useState("");
+  const [progress, setProgress] = useState(null), [progressError, setProgressError] = useState(""), [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [insights, setInsights] = useState(null), [insightsLoading, setInsightsLoading] = useState(false), [insightsError, setInsightsError] = useState("");
+  const activeSource = useRef(filters.source);
+  const restoredSourceFor = useRef(null);
+  activeSource.current = filters.source;
   const requestSeq = useRef(0);
   const detailSeq = useRef(0);
   const admin = queue.role === "admin";
   const ownerOptions = queue.users.map((u) => ({ value: u.id, label: u.name }));
   const selectedSource = sources.find((source) => source.id === filters.source);
   const sourceOptions = sources.map((source) => ({ value: source.id, label: `${source.name} (${source.active_count})` }));
+  useEffect(() => {
+    const uid = queue.viewer.id;
+    if (!uid || sourcesLoading || sourceError || restoredSourceFor.current === uid) return;
+    restoredSourceFor.current = uid;
+    const params = new URLSearchParams(window.location.search);
+    if (filters.source || params.get("source") || params.get("lead")) return;
+    try {
+      const saved = localStorage.getItem(`crm-sales-source:${uid}`);
+      if (saved && sources.some((source) => source.id === saved)) changeSource(saved);
+    } catch { /* Browsers may disable local storage; source selection still works. */ }
+  }, [queue.viewer.id, sourcesLoading, sourceError, sources, filters.source]);
+  useEffect(() => {
+    if (!queue.viewer.id || !filters.source) return;
+    try { localStorage.setItem(`crm-sales-source:${queue.viewer.id}`, filters.source); } catch { /* Optional device preference. */ }
+  }, [queue.viewer.id, filters.source]);
+  const selectable = queue.leads.filter((lead) => lead.import_id).map((lead) => lead.id);
+  const pageSelected = selectable.length > 0 && selectable.every((id) => selectedIds.includes(id));
+  function selectLeads(ids) {
+    if (ids.length > 10000) return toast.error("Select up to 10,000 leads, or use Delete all imported");
+    setSelectedIds(ids);
+  }
+
+  useEffect(() => {
+    let alive = true;
+    if (!filters.source) { setProgress(null); setInsights(null); setProgressError(""); setInsightsError(""); return; }
+    setInsightsLoading(true); setProgressError(""); setInsightsError("");
+    const params = new URLSearchParams({ source: filters.source });
+    api(`/progress?${params}`).then((data) => { if (alive) setProgress(data); }).catch((e) => { if (alive) setProgressError(e.message); });
+    api(`/insights?${params}`).then((data) => { if (alive) setInsights(data); }).catch((e) => { if (alive) setInsightsError(e.message); }).finally(() => { if (alive) setInsightsLoading(false); });
+    return () => { alive = false; };
+  }, [filters.source, revision]);
+
+  async function bookmarkLead(lead) {
+    if (bookmarkBusy) return;
+    const source = lead.source_id || filters.source;
+    const removing = progress?.bookmark?.id === lead.id;
+    setBookmarkBusy(true);
+    try {
+      const data = await api("/progress", { method: "POST", body: { source_id: source, lead_id: removing ? null : lead.id } });
+      if (activeSource.current === source) { setProgress(data); setProgressError(""); }
+      toast.success(removing ? "Bookmark removed" : "Bookmark saved");
+    } catch (e) { toast.error(e.message); } finally { setBookmarkBusy(false); }
+  }
+
+  async function resumeLead(kind) {
+    const source = filters.source;
+    try {
+      const data = await api(`/progress?${new URLSearchParams({ source })}`);
+      if (activeSource.current !== source) return;
+      setProgress(data);
+      const target = data[kind];
+      if (!target) return toast.error("This lead is no longer available");
+      setSelectedIds([]); setFilters({ search: "", status: "", owner: "", due: "", archived: "", source });
+      setView("leads"); setPage(target.page || 1); setFollowupPage(1);
+      const url = new URL(window.location.href); url.searchParams.set("view", "leads");
+      if (kind === "bookmark") {
+        closeLead(); setHighlightLeadId(target.id); setQueue((q) => ({ ...q, leads: [] }));
+        setPendingBookmark({ id: target.id, page: target.page || 1, source });
+        setRevision((v) => v + 1); url.searchParams.delete("lead");
+      } else { openLead(target.id); url.searchParams.set("lead", target.id); }
+      window.history.replaceState(null, "", url);
+    } catch (e) { toast.error(e.message); }
+  }
 
   useEffect(() => {
     setViewedAt(fmt(new Date()));
@@ -147,8 +242,9 @@ export default function SalesWorkspace() {
 
   useEffect(() => {
     const seq = ++requestSeq.current;
+    setLoading(true);
     const timer = setTimeout(async () => {
-      setLoading(true); setError("");
+      setError("");
       try {
         const p = new URLSearchParams({ ...filters, page: String(page) });
         const data = await api(`?${p}`);
@@ -158,6 +254,17 @@ export default function SalesWorkspace() {
     }, 250);
     return () => clearTimeout(timer);
   }, [filters, page, revision]);
+
+  useEffect(() => {
+    if (!pendingBookmark || loading || view !== "leads") return;
+    if (filters.source !== pendingBookmark.source || page !== pendingBookmark.page) { setPendingBookmark(null); return; }
+    if (!queue.leads.some((lead) => lead.id === pendingBookmark.id)) return;
+    const row = document.querySelector(`[data-lead-id="${pendingBookmark.id}"]`);
+    if (!row) return;
+    row.focus({ preventScroll: true });
+    row.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    setPendingBookmark(null);
+  }, [pendingBookmark, loading, queue.leads, view, filters.source, page]);
 
   const loadDetail = useCallback(async () => {
     if (!leadId) return;
@@ -186,8 +293,9 @@ export default function SalesWorkspace() {
     return () => { alive = false; };
   }, [queue.role, admin, view, revision, eodDate, filters.owner, filters.source, followupPage]);
 
-  function changeFilter(key, value) { setPage(1); setFollowupPage(1); setFilters((f) => ({ ...f, [key]: value })); }
+  function changeFilter(key, value) { setSelectedIds([]); setPage(1); setFollowupPage(1); setFilters((f) => ({ ...f, [key]: value })); }
   function changeSource(id) {
+    setProgress(null); setInsights(null);
     requestSeq.current++;
     setQueue((q) => ({ ...q, leads: [], total: 0 })); setLoading(true);
     setEod([]); setFollowups({ followups: [], total: 0 });
@@ -220,75 +328,93 @@ export default function SalesWorkspace() {
   return (
     <SalesViewer.Provider value={`${queue.viewer.name || "Authorized CRM user"} · ${viewedAt}`}>
       <div data-sales-workspace className={styles.workspace} onCopy={protectCopy} onCut={protectCopy} onContextMenu={protectCopy}>
-        <PageHeader eyebrow="Sales workspace" title="Lead & Calling Desk" description={admin ? "Team pipeline / IST (UTC+05:30)" : "My pipeline / IST (UTC+05:30)"} icon={PhoneCall} actions={<div className={styles.actions}>
-            <button type="button" title="Refresh sales workspace" aria-label="Refresh sales workspace" className={styles.iconButton} onClick={refresh}><RefreshCw size={17} /></button>
-            {admin && <button className={styles.secondary} onClick={() => setImportOpen(true)}><Upload size={16} /> Import sheet</button>}
-            <button className={styles.primary} disabled={!selectedSource} onClick={() => setCreateOpen(true)}><Plus size={16} /> Add lead</button>
-          </div>} />
+        <PageHeader eyebrow="Sales team" title="Leads & Calling Desk" description={admin ? "Team calling and follow-ups" : "Your leads and follow-ups"} icon={PhoneCall} actions={<div className={styles.actions}>
+          <TipButton type="button" tooltip="Refresh calling desk" aria-label="Refresh sales workspace" className={styles.iconButton} onClick={refresh}><RefreshCw size={17} /></TipButton>
+          {["admin", "sales"].includes(queue.role) && <button className={styles.secondary} onClick={() => setImportOpen(true)}><Upload size={16} /> Import sheet</button>}
+          <button className={styles.primary} disabled={!selectedSource} onClick={() => setCreateOpen(true)}><Plus size={16} /> Add lead</button>
+        </div>} />
         <section className={styles.sourceBar} aria-label="Lead source">
           <FolderOpen size={22} className={styles.sourceIcon} />
-          <div className={styles.sourceSelect}><FormSelect label="Source" name="sales_source" value={filters.source} options={[{ value: "", label: sourcesLoading ? "Loading sources..." : "Select a source" }, ...sourceOptions]} onValueChange={changeSource} /></div>
-          {selectedSource && <div className={styles.sourceMeta}><strong>{selectedSource.active_count} active leads</strong><span>{selectedSource.lead_count} total{selectedSource.last_import_at ? ` / Last import ${fmt(selectedSource.last_import_at, true)}` : ""}</span></div>}
-          {admin && selectedSource && <button className={styles.secondary} onClick={() => setImportOpen(true)}><Upload size={16} />Add data</button>}
+          <div className={styles.sourceSelect}><FormSelect label="Lead source" name="sales_source" isSearchable placeholder="Select a calling list" value={filters.source} options={[{ value: "", label: sourcesLoading ? "Loading sources..." : "Select a source" }, ...sourceOptions]} onValueChange={changeSource} /></div>
+          {selectedSource && <div className={styles.sourceMeta}><strong>{selectedSource.active_count} active {Number(selectedSource.active_count) === 1 ? "lead" : "leads"}</strong><span>{selectedSource.lead_count} total{selectedSource.last_import_at ? ` / Last import ${fmt(selectedSource.last_import_at, true)}` : ""}</span></div>}
+          {filters.source && <div className={styles.resumeBar}>
+          {progress?.last_call && <CrmTooltip content={progress.last_call.name}><button className={styles.secondary} onClick={() => resumeLead("last_call")}><History size={16} />Resume last call</button></CrmTooltip>}
+          {progress?.bookmark && <CrmTooltip content={progress.bookmark.name}><button className={`${styles.secondary} ${styles.bookmarkAction}`} onClick={() => resumeLead("bookmark")}><BookmarkCheck size={16} />Open bookmark</button></CrmTooltip>}
+          {progressError && <span role="alert" className={styles.overdue}>{progressError}<button className={styles.clear} onClick={refresh}>Retry</button></span>}
+          </div>}
         </section>
         {sourceError && <p role="alert" className={styles.error}>{sourceError}</p>}
         {/* <div className={styles.confidential}><ShieldCheck size={14} /><span>Confidential</span><span className={styles.watermark}>{queue.viewer.name || "Authorized CRM user"} · {viewedAt}</span></div> */}
         <div className={styles.metricHeading}><span>Call activity · {fmt(`${eodDate}T00:00:00+05:30`, true)}</span><small>Recorded attempts, not unique leads</small></div>
         <div className={styles.metrics}>{METRICS.map(([key, label]) => <div key={key} className={styles.metric}><span>{label}</span><strong>{resourceLoading ? "-" : totals[key]}</strong></div>)}</div>
+        {filters.source && <SalesInsights data={insights} loading={insightsLoading} error={insightsError} onRetry={refresh} />}
         <nav className={styles.tabs} aria-label="Sales views">{VIEWS.map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? styles.activeTab : ""} aria-current={view === id ? "page" : undefined} onClick={() => { setView(id); const url = new URL(window.location.href); url.searchParams.set("view", id); window.history.replaceState(null, "", url); }}><Icon size={16} />{label}</button>)}</nav>
 
         {admin && view !== "leads" && <div className={styles.ownerFilter}><FormSelect label="Team member" name="sales_owner" value={filters.owner === "unassigned" ? "" : filters.owner} options={ownerOptions} includeAll allLabel="All team members" onValueChange={(v) => changeFilter("owner", v)} /></div>}
         {!filters.source ? <div className={styles.empty}><FolderOpen size={28} /><h3>Select a source</h3></div> : <>
-        {view === "leads" && <>
-          <div className={styles.filters}>
-            <div className={styles.search}><Search size={17} /><input aria-label="Search leads" placeholder="Search name, phone or email" value={filters.search} onChange={(e) => changeFilter("search", e.target.value)} /></div>
-            <FormSelect name="sales_status" value={filters.status} options={SALES_STATUSES} includeAll allLabel="All statuses" onValueChange={(v) => changeFilter("status", v)} />
-            {admin && <FormSelect name="assigned_to" value={filters.owner} options={[{ value: "unassigned", label: "Unassigned" }, ...ownerOptions]} includeAll allLabel="All owners" onValueChange={(v) => changeFilter("owner", v)} />}
-            <label className={styles.check}><input type="checkbox" checked={filters.due === "overdue"} onChange={(e) => changeFilter("due", e.target.checked ? "overdue" : "")} />Overdue</label>
-            {admin && <label className={styles.check}><input type="checkbox" checked={filters.archived === "true"} onChange={(e) => changeFilter("archived", e.target.checked ? "true" : "")} />Archived</label>}
-            {activeFilters > 0 && <button className={styles.clear} onClick={() => { setFilters((f) => ({ search: "", status: "", owner: "", due: "", archived: "", source: f.source })); setPage(1); setFollowupPage(1); }}><X size={14} />Clear ({activeFilters})</button>}
-          </div>
-          {error ? <div role="alert" className={styles.error}>{error}<button onClick={refresh} className={styles.secondary}>Retry</button></div> : loading ? <div className={styles.empty}><Loader2 className={styles.spinner} size={22} />Loading leads</div> : queue.leads.length ? <>
-            <div className={styles.leadTable}>
-              <div className={styles.tableHeader}><span>Name / Contact</span><span>Status / Follow-up</span><span>Latest remark</span><span>Done by</span><span>Address</span><span /></div>
-              {queue.leads.map((lead) => <article key={lead.id} className={styles.leadRow}>
-                <div><button className={styles.name} onClick={() => openLead(lead.id)}>{lead.name}</button><span className={styles.contact}><Phone size={12} /> {lead.phone}</span>{lead.email && <span className={styles.muted}>{lead.email}</span>}</div>
-                <div className={styles.stack}><Status value={lead.status} />{lead.next_due && <span className={new Date(lead.next_due) < new Date() ? styles.overdue : styles.muted}><Clock3 size={12} />{fmt(lead.next_due)}</span>}</div>
-                <div><p className={styles.remark}>{lead.latest_activity?.remark || "-"}</p>{lead.latest_activity && <small className={styles.muted}>{fmt(lead.latest_activity.created_at)}</small>}</div>
-                <div className={styles.muted}>{lead.latest_activity?.done_by || "-"}{lead.latest_activity?.source_done_by && <small>Sheet: {lead.latest_activity.source_done_by}</small>}</div>
-                <div><LeadAddress lead={lead} editable={admin || !lead.archived_at} onSaved={addressSaved} /></div>
-                <div className={styles.rowActions}><button className={styles.iconButton} title="Log a call" aria-label={`Log a call for ${lead.name}`} disabled={Boolean(lead.archived_at)} onClick={() => { openLead(lead.id); setActivityKind("call"); }}><PhoneCall size={17} /></button><button className={styles.iconButton} onClick={() => openLead(lead.id)} title="Open lead" aria-label={`Open ${lead.name}`}><ChevronRight size={17} /></button></div>
-              </article>)}
-            </div><Pager page={page} total={queue.total} onChange={setPage} />
-          </> : <div className={styles.empty}><PhoneCall size={28} /><h3>No leads found</h3><p>{admin ? "Add a lead or import a calling sheet." : "Your assigned leads will appear here."}</p></div>}
-        </>}
+          {view === "leads" && <>
+            <div className={styles.filters}>
+              <div className={styles.search}><Search size={17} /><input aria-label="Search leads" placeholder="Search name, phone or email" value={filters.search} onChange={(e) => changeFilter("search", e.target.value)} /></div>
+              <FormSelect name="sales_status" value={filters.status} options={SALES_STATUSES} includeAll allLabel="All statuses" onValueChange={(v) => changeFilter("status", v)} />
+              {admin && <FormSelect name="assigned_to" value={filters.owner} options={[{ value: "unassigned", label: "Unassigned" }, ...ownerOptions]} includeAll allLabel="All owners" onValueChange={(v) => changeFilter("owner", v)} />}
+              <label className={styles.check}><input type="checkbox" checked={filters.due === "overdue"} onChange={(e) => changeFilter("due", e.target.checked ? "overdue" : "")} />Overdue</label>
+              {admin && <label className={styles.check}><input type="checkbox" checked={filters.archived === "true"} onChange={(e) => changeFilter("archived", e.target.checked ? "true" : "")} />Archived</label>}
+              {activeFilters > 0 && <button className={styles.clear} onClick={() => { setSelectedIds([]); setFilters((f) => ({ search: "", status: "", owner: "", due: "", archived: "", source: f.source })); setPage(1); setFollowupPage(1); }}><X size={14} />Clear ({activeFilters})</button>}
+            </div>
+            {admin && selectedSource && <div className={styles.bulkBar}>
+              <label className={styles.check}><input type="checkbox" aria-label="Select imported leads on this page" disabled={loading || !selectable.length} checked={pageSelected} ref={(node) => { if (node) node.indeterminate = !pageSelected && selectable.some((id) => selectedIds.includes(id)); }} onChange={() => selectLeads(pageSelected ? selectedIds.filter((id) => !selectable.includes(id)) : [...new Set([...selectedIds, ...selectable])])} />Select page</label>
+              <span className={styles.muted}>{selectedIds.length} selected</span>
+              {selectedIds.length > 0 && <><button className={styles.clear} onClick={() => setSelectedIds([])}>Clear selection</button><button className={styles.danger} onClick={() => setDeleteTarget({ source_id: filters.source, ids: [...selectedIds], all: false })}><Trash2 size={15} />Delete selected ({selectedIds.length})</button></>}
+              <button className={`${styles.cancel} ${styles.deleteAll}`} onClick={() => setDeleteTarget({ source_id: filters.source, ids: [], all: true })}><Trash2 size={15} />Delete all imported</button>
+            </div>}
+            {error ? <div role="alert" className={styles.error}>{error}<button onClick={refresh} className={styles.secondary}>Retry</button></div> : loading ? <div className={styles.empty}><Loader2 className={styles.spinner} size={22} />Loading leads</div> : queue.leads.length ? <>
+              <div className={styles.leadTable}>
+                <div className={styles.tableHeader}><span>Name / Entity</span><span>Phone Number</span><span>Address</span><span className={styles.statusHeading}>Status / Follow-up</span><span>Latest Remark</span><span>Done by</span><span aria-label="Actions" /></div>
+                {queue.leads.map((lead) => <article key={lead.id} data-lead-id={lead.id} tabIndex={-1} className={`${styles.leadRow} ${highlightLeadId === lead.id ? styles.highlightedLead : ""}`}>
+                  <div className={styles.leadIdentity}>{admin && lead.import_id && <input type="checkbox" aria-label={`Select ${lead.name}`} checked={selectedIds.includes(lead.id)} onChange={(e) => selectLeads(e.target.checked ? [...selectedIds, lead.id] : selectedIds.filter((id) => id !== lead.id))} />}<div><button className={styles.name} onClick={() => openLead(lead.id)}>{lead.name}</button></div></div>
+                  <div data-label="Phone Number"><LeadPhones value={lead.phone} /></div>
+                  <div data-label="Address"><LeadAddress lead={lead} editable={admin || !lead.archived_at} onSaved={addressSaved} /></div>
+                  <div data-label="Status / Follow-up" className={`${styles.stack} ${styles.statusCell}`}><Status value={lead.status} />{lead.next_due && <span className={new Date(lead.next_due) < new Date() ? styles.overdue : styles.muted}><Clock3 size={12} />{fmt(lead.next_due)}</span>}</div>
+                  <div data-label="Latest Remark"><p className={styles.remark}>{lead.latest_activity?.remark || "-"}</p>{lead.latest_activity && <small className={styles.muted}>{fmt(lead.latest_activity.created_at)}</small>}</div>
+                  <div data-label="Done by" className={styles.muted}><CrmTooltip content={lead.first_worked_by ? `First activity: ${fmt(lead.first_worked_by.created_at)}` : null} side="left"><span tabIndex={lead.first_worked_by ? 0 : undefined}>{lead.first_worked_by?.name || "-"}</span></CrmTooltip></div>
+<div className={styles.rowActions}><TipButton className={`${styles.iconButton} ${styles.callAction}`} tooltip="Log a call" aria-label={`Log a call for ${lead.name}`} disabled={Boolean(lead.archived_at)} onClick={() => { openLead(lead.id); setActivityKind("call"); }}><PhoneCall size={17} /></TipButton><TipButton className={`${styles.iconButton} ${styles.openAction}`} onClick={() => openLead(lead.id)} tooltip="Open lead" side="left" aria-label={`Open ${lead.name}`}><ChevronRight size={17} /></TipButton>{(!progress?.bookmark || progress.bookmark.id === lead.id) && <TipButton className={`${styles.iconButton} ${styles.bookmarkAction}`} tooltip={progress?.bookmark?.id === lead.id ? "Remove bookmark" : "Bookmark this lead"} side="left" aria-label={`Bookmark ${lead.name}`} aria-pressed={progress?.bookmark?.id === lead.id} disabled={bookmarkBusy || Boolean(lead.archived_at)} onClick={() => bookmarkLead(lead)}>{progress?.bookmark?.id === lead.id ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</TipButton>}</div>
+                </article>)}
+              </div><Pager page={page} total={queue.total} onChange={setPage} pageSize={SALES_PAGE_SIZE} />
+            </> : <div className={styles.empty}><PhoneCall size={28} /><h3>No leads found</h3><p>{admin ? "Add a lead or import a calling sheet." : "Your assigned leads will appear here."}</p></div>}
+          </>}
 
-        {view === "followups" && <section>
-          {resourceError && <p className={styles.error} role="alert">{resourceError}</p>}
-          {resourceLoading ? <div className={styles.empty}>Loading follow-ups...</div> : followups.followups.length ? followups.followups.map((f) => <article key={f.id} className={styles.followupRow}>
-            <div><button className={styles.name} onClick={() => openLead(f.lead_id)}>{f.lead.name}</button><p className={styles.muted}>{f.title}</p></div>
-            <span className={Date.parse(f.due_at) <= Date.now() ? styles.overdue : styles.muted}>{fmt(f.due_at)}</span>
-            <div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={() => setSnooze(f)}><Clock3 size={15} />Snooze</button><button title="Complete reminder" aria-label="Complete reminder" className={styles.iconButton} disabled={busy} onClick={() => updateReminder(f, "complete")}><Check size={17} /></button><button className={styles.primary} onClick={() => openLead(f.lead_id)}>Open lead<ChevronRight size={15} /></button></div>
-          </article>) : <div className={styles.empty}>No pending follow-ups.</div>}
-          <Pager page={followupPage} total={followups.total} onChange={setFollowupPage} />
-        </section>}
-        {view === "calendar" && <MeetingsCalendar key={filters.source} source={filters.source} owner={admin && filters.owner !== "unassigned" ? filters.owner : ""} revision={revision} onOpen={openLead} />}
-        {view === "eod" && <section>
-          <div className={styles.eodToolbar}><FormInput name="sales_eod_date" type="date" label="Report date" maxDate={istDate()} value={eodDate} onValueChange={setEodDate} /><p className={styles.muted}>Call attempts recorded between 00:00 and 23:59 IST. Imports, remarks and meeting-only updates are excluded.</p></div>
-          {resourceError && <p className={styles.error}>{resourceError}</p>}
-          <div className={styles.eodRows}>{eod.map((row) => <article key={row.user_id} className={styles.eodRow}><h3><UserRound size={16} />{row.user_name}</h3><dl>{METRICS.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key]}</dd></div>)}</dl></article>)}</div>
-          {!eod.length && !resourceLoading && !resourceError && <div className={styles.empty}>No sales activity for this date.</div>}
-        </section>}
+          {view === "followups" && <section>
+            {resourceError && <p className={styles.error} role="alert">{resourceError}</p>}
+            {resourceLoading ? <div className={styles.empty}>Loading follow-ups...</div> : followups.followups.length ? followups.followups.map((f) => <article key={f.id} className={styles.followupRow}>
+              <div><button className={styles.name} onClick={() => openLead(f.lead_id)}>{f.lead.name}</button><p className={styles.muted}>{f.title}</p></div>
+              <span className={Date.parse(f.due_at) <= Date.now() ? styles.overdue : styles.muted}>{fmt(f.due_at)}</span>
+              <div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={() => setSnooze(f)}><Clock3 size={15} />Snooze</button><TipButton tooltip="Complete reminder" aria-label="Complete reminder" className={styles.iconButton} disabled={busy} onClick={() => updateReminder(f, "complete")}><Check size={17} /></TipButton><button className={styles.primary} onClick={() => openLead(f.lead_id)}>Open lead<ChevronRight size={15} /></button></div>
+            </article>) : <div className={styles.empty}>No pending follow-ups.</div>}
+            <Pager page={followupPage} total={followups.total} onChange={setFollowupPage} />
+          </section>}
+          {view === "calendar" && <MeetingsCalendar key={filters.source} source={filters.source} owner={admin && filters.owner !== "unassigned" ? filters.owner : ""} revision={revision} onOpen={openLead} />}
+          {view === "eod" && <section>
+            <div className={styles.eodToolbar}><FormInput name="sales_eod_date" type="date" label="Report date" maxDate={istDate()} value={eodDate} onValueChange={setEodDate} /><p className={styles.muted}>Call attempts recorded between 00:00 and 23:59 IST. Imports, remarks and meeting-only updates are excluded.</p></div>
+            {resourceError && <p className={styles.error}>{resourceError}</p>}
+            <div className={styles.eodRows}>{eod.map((row) => <article key={row.user_id} className={styles.eodRow}><h3><UserRound size={16} />{row.user_name}</h3><dl>{METRICS.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key]}</dd></div>)}</dl></article>)}</div>
+            {!eod.length && !resourceLoading && !resourceError && <div className={styles.empty}>No sales activity for this date.</div>}
+          </section>}
 
         </>}
         {createOpen && <LeadForm users={ownerOptions} sources={sources} sourceId={filters.source} admin={admin} onClose={() => setCreateOpen(false)} onSaved={(lead) => { setCreateOpen(false); changeSource(lead.source_id); refresh(); openLead(lead.id); }} />}
-        {importOpen && <ImportDialog users={ownerOptions} sources={sources} sourceId={filters.source} onClose={() => setImportOpen(false)} onSaved={(data) => { changeSource(data.source_id); refresh(); }} />}
+        {importOpen && <ImportDialog users={ownerOptions} viewerId={queue.viewer.id} admin={admin} sources={sources} sourceId={filters.source} onClose={() => setImportOpen(false)} onSaved={(data) => { changeSource(data.source_id); refresh(); }} />}
+        {admin && deleteTarget && <DeleteLeadsDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={(data) => {
+          if (deleteTarget.all || deleteTarget.ids.includes(leadId)) closeLead();
+          setDeleteTarget(null); setSelectedIds([]); setPage(1); setQueue((q) => ({ ...q, leads: [], total: 0 })); setLoading(true); refresh();
+          toast.success(`${data.deleted} imported leads deleted`);
+        }} />}
         {leadId && <Dialog title={detail?.lead.name || "Lead details"} wide onClose={closeLead}>
           {detailLoading ? <div className={styles.empty}><Loader2 className={styles.spinner} />Loading lead...</div> : detail ? <>
-            <div className={styles.leadOverview}><Status value={detail.lead.status} /><span className={styles.muted}>Source: {sources.find((s) => s.id === detail.lead.source_id)?.name || detail.lead.source}</span><span className={styles.muted}>Owner: {detail.lead.assigned_name}</span><span className={styles.muted}>RNR attempts: {detail.lead.rnr_count}/6</span></div>
-            <div className={styles.contactBand}><a href={`tel:${detail.lead.phone_key}`}><Phone size={16} />{detail.lead.phone}</a>{detail.lead.email && <span>{detail.lead.email}</span>}</div>
+            <div className={styles.leadOverview}><Status value={detail.lead.status} /><span className={styles.muted}>Source: {sources.find((s) => s.id === detail.lead.source_id)?.name || detail.lead.source}</span><span className={styles.muted}>Assigned to: {detail.lead.assigned_names?.join(", ") || detail.lead.assigned_name}</span><span className={styles.muted}>Meeting coordinator: {detail.lead.assigned_name}</span><span className={styles.muted}>RNR attempts: {detail.lead.rnr_count}/6</span></div>
+            <div className={styles.contactBand}>{phoneNumbers(detail.lead.phone).map((number) => <a key={number.key} href={`tel:${number.key}`}><Phone size={16} />{number.phone}</a>)}{detail.lead.email && <span>{detail.lead.email}</span>}</div>
             <div className={styles.detailSection}><h3>Address</h3><LeadAddress lead={detail.lead} editable={admin || !detail.lead.archived_at} onSaved={addressSaved} /></div>
             <div className={styles.actions}>
+              {!detail.lead.archived_at && (!progress?.bookmark || progress.bookmark.id === detail.lead.id) && <button className={`${styles.secondary} ${styles.bookmarkAction}`} disabled={bookmarkBusy} onClick={() => bookmarkLead(detail.lead)}>{progress?.bookmark?.id === detail.lead.id ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}{progress?.bookmark?.id === detail.lead.id ? "Remove bookmark" : "Bookmark lead"}</button>}
               {queue.leads.findIndex((l) => l.id === detail.lead.id) >= 0 && queue.leads.findIndex((l) => l.id === detail.lead.id) < queue.leads.length - 1 && <button className={styles.secondary} onClick={() => openLead(queue.leads[queue.leads.findIndex((l) => l.id === detail.lead.id) + 1].id)}>Next lead<ChevronRight size={15} /></button>}
               {!detail.lead.archived_at && <>
                 <button className={styles.primary} disabled={["Do Not Call", "Converted"].includes(detail.lead.status)} onClick={() => setActivityKind("call")}><PhoneCall size={16} />Log call</button>
@@ -298,7 +424,7 @@ export default function SalesWorkspace() {
               </>}
               {admin && <button className={styles.secondary} onClick={() => setContactOpen(true)}><UserRound size={16} />Manage lead</button>}
             </div>
-            {detail.followups.length > 0 && <section className={styles.detailSection}><h3><CalendarClock size={16} />Upcoming reminders</h3>{detail.followups.map((f) => <div key={f.id} className={styles.inlineReminder}><span>{f.title}</span><strong className={Date.parse(f.due_at) <= Date.now() ? styles.overdue : ""}>{fmt(f.due_at)}</strong><button className={styles.iconButton} title="Complete reminder" aria-label="Complete reminder" disabled={busy} onClick={() => updateReminder(f, "complete")}><Check size={15} /></button></div>)}</section>}
+            {detail.followups.length > 0 && <section className={styles.detailSection}><h3><CalendarClock size={16} />Upcoming reminders</h3>{detail.followups.map((f) => <div key={f.id} className={styles.inlineReminder}><span>{f.title}</span><strong className={Date.parse(f.due_at) <= Date.now() ? styles.overdue : ""}>{fmt(f.due_at)}</strong><TipButton className={styles.iconButton} tooltip="Complete reminder" aria-label="Complete reminder" disabled={busy} onClick={() => updateReminder(f, "complete")}><Check size={15} /></TipButton></div>)}</section>}
             {detail.meetings.length > 0 && <section className={styles.detailSection}><h3><CalendarDays size={16} />Meetings</h3>{detail.meetings.map((m) => <div key={m.id} className={styles.inlineReminder}><span>{fmt(m.starts_at)} · {m.status}{m.location && <small className={styles.muted}>{m.location}</small>}</span>{m.meeting_note_id && <Link className={styles.link} href={`/admin/meeting-notes?meeting_id=${m.meeting_note_id}`}>Meeting Notes<ChevronRight size={14} /></Link>}{m.status === "Scheduled" && <button className={styles.clear} onClick={() => setActivityKind("cancel")}>Cancel meeting</button>}</div>)}</section>}
             <section className={styles.detailSection}><h3><History size={16} />Activity & remarks</h3><ol className={styles.timeline}>{detail.activities.map((a) => <li key={a.id}>
               <div className={styles.timelineHeader}><strong>{a.done_by}</strong><span className={styles.kind}>{a.kind}</span><time dateTime={a.created_at}>{fmt(a.created_at)}</time></div>
@@ -317,7 +443,7 @@ export default function SalesWorkspace() {
 }
 
 function LeadForm({ lead, users, sources = [], sourceId = "", admin, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: lead?.name || "", phone: lead?.phone || "", email: lead?.email || "", address: lead?.address || "", source_id: sourceId, assigned_to: lead?.assigned_to || "", remark: "", archived: Boolean(lead?.archived_at), reopen: false });
+  const [form, setForm] = useState({ name: lead?.name || "", phone: lead?.phone || "", email: lead?.email || "", address: lead?.address || "", source_id: sourceId, assigned_to: lead?.assigned_to || "", assigned_user_ids: lead?.assigned_user_ids || (lead?.assigned_to ? [lead.assigned_to] : []), remark: "", archived: Boolean(lead?.archived_at), reopen: false });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   async function save(e) {
@@ -331,7 +457,7 @@ function LeadForm({ lead, users, sources = [], sourceId = "", admin, onClose, on
     <FormInput label="Phone" name="sales_phone" type="tel" value={form.phone} onValueChange={(v) => set("phone", v)} required />
     <FormInput label="Email address" name="sales_email" type="email" value={form.email} onValueChange={(v) => set("email", v)} />
     {!lead && <FormInput label="Address" name="sales_address" multiline rows={3} value={form.address} onValueChange={(v) => set("address", v)} />}
-    {admin && <FormSelect label="Assigned to" name="sales_assign" options={[{ value: "", label: "Unassigned" }, ...users]} value={form.assigned_to} onValueChange={(v) => set("assigned_to", v)} />}
+    {admin && (lead ? <FormSelect label="Assigned to" name="sales_assign" options={users} isMulti isSearchable value={form.assigned_user_ids} onValueChange={(v) => set("assigned_user_ids", v)} placeholder="Unassigned" /> : <FormSelect label="Assigned to" name="sales_assign" options={[{ value: "", label: "Unassigned" }, ...users]} value={form.assigned_to} onValueChange={(v) => set("assigned_to", v)} />)}
     {!lead && <FormInput label="Initial remark" name="sales_initial_remark" multiline rows={3} value={form.remark} onValueChange={(v) => set("remark", v)} />}
     {lead && <><label className={styles.check}><input type="checkbox" checked={form.archived} onChange={(e) => set("archived", e.target.checked)} />Archive lead</label>{["Do Not Call", "Converted", "Not Interested", "Wrong Number"].includes(lead.status) && <label className={styles.check}><input type="checkbox" checked={form.reopen} onChange={(e) => set("reopen", e.target.checked)} />Reopen lead for calling</label>}</>}
     <div className={styles.formActions}><button type="button" className={styles.cancel} disabled={saving} onClick={onClose}>Cancel</button><button className={styles.primary} disabled={saving}>{saving ? "Saving..." : lead ? "Save changes" : "Add lead"}</button></div>
@@ -380,9 +506,9 @@ function ActivityDialog({ lead, preset, onClose, onSaved }) {
   </form></Dialog>;
 }
 
-function ImportDialog({ users, sources, sourceId, onClose, onSaved }) {
+function ImportDialog({ users, sources, sourceId, viewerId, admin, onClose, onSaved }) {
   const [preview, setPreview] = useState(null);
-  const [owner, setOwner] = useState("");
+  const [owners, setOwners] = useState(admin ? [] : [viewerId].filter(Boolean));
   const [busy, setBusy] = useState(false);
   const [file, setFile] = useState(null);
   const [sheet, setSheet] = useState("");
@@ -402,28 +528,61 @@ function ImportDialog({ users, sources, sourceId, onClose, onSaved }) {
     if (busy || !preview) return;
     setBusy(true);
     try {
-      const data = await api("/import", { method: "PUT", body: { filename: preview.filename, source_id: sourceMode === "existing" ? targetSource : null, source_name: sourceMode === "new" ? sourceName : null, assigned_to: owner || null, rows: preview.rows.filter((r) => r.valid) } });
+      const data = await api("/import", { method: "PUT", body: { filename: preview.filename, source_id: sourceMode === "existing" ? targetSource : null, source_name: sourceMode === "new" ? sourceName : null, assigned_user_ids: owners, rows: preview.rows.filter((r) => r.valid) } });
       setResult(data); setPreview(null); toast.success(`${data.accepted} leads imported into ${data.source_name}`); onSaved(data);
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
   return <Dialog title={result ? `Imported into ${result.source_name}` : "Import calling sheet"} wide onClose={() => { if (!busy) onClose(); }}>
     <div className={styles.form}>
       {!result && <>
-      <div className={styles.sourceModes} role="group" aria-label="Import destination">{[["existing", "Existing source"], ["new", "New source"]].map(([value, label]) => <button type="button" key={value} aria-pressed={sourceMode === value} disabled={busy} onClick={() => setSourceMode(value)}>{label}</button>)}</div>
-      {sourceMode === "existing" ? <FormSelect label="Source" name="import_source" value={targetSource} options={[{ value: "", label: "Select a source" }, ...sources.map((s) => ({ value: s.id, label: `${s.name} (${s.active_count} active)` }))]} onValueChange={setTargetSource} /> : <FormInput label="Source name" name="import_source_name" value={sourceName} onValueChange={setSourceName} maxLength={120} required />}
-      <label className={styles.fileLabel}><Upload size={20} /><span>{file?.name || "Choose Excel / CSV file"}</span><input aria-label="Calling sheet" type="file" accept=".xlsx,.xls,.csv" disabled={busy} onChange={(e) => readFile(e.target.files[0])} /></label>
-      <FormSelect label="Assign imported leads to" name="import_owner" value={owner} options={[{ value: "", label: "Unassigned" }, ...users]} onValueChange={setOwner} />
+        <div className={styles.sourceModes} role="group" aria-label="Import destination">{[["existing", "Existing source"], ["new", "New source"]].map(([value, label]) => <button type="button" key={value} aria-pressed={sourceMode === value} disabled={busy} onClick={() => setSourceMode(value)}>{label}</button>)}</div>
+        {sourceMode === "existing" ? <FormSelect label="Source" name="import_source" value={targetSource} options={[{ value: "", label: "Select a source" }, ...sources.map((s) => ({ value: s.id, label: `${s.name} (${s.active_count} active)` }))]} onValueChange={setTargetSource} /> : <FormInput label="Source name" name="import_source_name" value={sourceName} onValueChange={setSourceName} maxLength={120} required />}
+        <label className={styles.fileLabel}><Upload size={20} /><span>{file?.name || "Choose Excel / CSV file"}</span><small>Maximum 10,000 leads / 10 MB</small><input aria-label="Calling sheet" type="file" accept=".xlsx,.xls,.csv" disabled={busy} onChange={(e) => readFile(e.target.files[0])} /></label>
+        <FormSelect label="Assign imported leads to" name="import_owner" isMulti isSearchable disabled={busy} required={!admin} value={owners} options={users} onValueChange={setOwners} placeholder={admin ? "Unassigned" : "Select team members"} />
       </>}
       {preview?.sheets.length > 1 && <FormSelect label="Worksheet" name="import_sheet" value={sheet} options={preview.sheets} onValueChange={(v) => readFile(file, v)} />}
       {busy && <p className={styles.muted}>Processing calling sheet...</p>}
       {preview && <><div className={styles.importSummary}><strong>{preview.rows.length} rows</strong><span>{preview.valid} ready</span><span>{preview.rejected} rejected</span></div>
         <div className={styles.importRows}>{preview.rows.slice(0, visible).map((r) => <div key={r.row}><span>Row {r.row}</span><strong>{r.name || "-"}</strong><span>{r.phone}</span><span className={r.valid ? styles.success : styles.overdue}>{r.valid ? r.status : r.error}</span></div>)}</div>
         {visible < preview.rows.length && <button className={styles.secondary} onClick={() => setVisible((n) => n + 50)}>Show 50 more</button>}
-        <p className={styles.muted}>Source: <strong>{destination || "Not selected"}</strong></p>
-        <div className={styles.formActions}><button className={styles.cancel} disabled={busy} onClick={onClose}>Cancel</button><button className={styles.primary} disabled={busy || !preview.valid || !destination || (sourceMode === "new" && sourceName.trim().length > 120)} onClick={save}><Check size={16} />Import {preview.valid} valid leads</button></div>
+        <dl className={styles.importSummary}><div><dt>Source</dt><dd>{destination || "Not selected"}</dd></div><div><dt>Shared with</dt><dd>{owners.map((id) => users.find((u) => u.value === id)?.label || "Sales user").join(", ") || "Unassigned"}</dd></div><div><dt>Meeting coordinator</dt><dd>{users.find((u) => u.value === owners[0])?.label || "Unassigned"}</dd></div></dl>
+        <div className={styles.formActions}><button className={styles.cancel} disabled={busy} onClick={onClose}>Cancel</button><button className={styles.primary} disabled={busy || !preview.valid || !destination || (!admin && !owners.length) || (sourceMode === "new" && sourceName.trim().length > 120)} onClick={save}><Check size={16} />Import {preview.valid} valid leads</button></div>
       </>}
       {result && <div role="status"><p className={styles.success}>{result.accepted} imported · {result.rejected} rejected at save</p>{result.errors.map((e, i) => <p key={i} className={styles.muted}>Row {e.row}: {e.error}</p>)}<button className={styles.secondary} onClick={onClose}>Done</button></div>}
     </div>
+  </Dialog>;
+}
+
+function DeleteLeadsDialog({ target, onClose, onDeleted }) {
+  const [preview, setPreview] = useState(null), [loading, setLoading] = useState(true), [deleting, setDeleting] = useState(false);
+  const [confirmation, setConfirmation] = useState(""), [error, setError] = useState("");
+  const loadPreview = useCallback(async () => {
+    setLoading(true); setError(""); setPreview(null); setConfirmation("");
+    try { setPreview(await api("/bulk-delete", { method: "POST", body: target })); }
+    catch (e) { setError(e.message); } finally { setLoading(false); }
+  }, [target]);
+  useEffect(() => { loadPreview(); }, [loadPreview]);
+  const required = target.all ? preview?.source_name : "DELETE";
+  async function remove(e) {
+    e.preventDefault();
+    if (deleting || !preview?.count || confirmation.trim() !== required) return;
+    setDeleting(true); setError("");
+    try { onDeleted(await api("/bulk-delete", { method: "DELETE", body: { ...target, fingerprint: preview.fingerprint, confirmation } })); }
+    catch (e) { setError(e.message); } finally { setDeleting(false); }
+  }
+  return <Dialog title={target.all ? "Delete all imported leads" : "Delete selected leads"} onClose={() => { if (!deleting) onClose(); }}>
+    <form className={styles.form} onSubmit={remove}>
+      {loading ? <p className={styles.muted}>Checking imported leads...</p> : preview && <>
+        <p><strong>{preview.count.toLocaleString("en-IN")} imported leads</strong> in <strong>{preview.source_name}</strong></p>
+        {target.all && <p className={styles.muted}>Includes archived imported leads and every importer. Current table filters do not limit this deletion. Manually added leads and the source itself are kept.</p>}
+        {preview.count > 0 ? <><p className={styles.overdue}>Permanent deletion removes these leads, their call/remark history, scheduled meetings, follow-ups and lead notifications. Calculated call totals will change. Submitted EOD reports, tasks and saved Meeting Notes are kept.</p>
+          <p className={styles.muted}>Type <strong>{required}</strong> to confirm. This cannot be undone.</p>
+          <FormInput label="Deletion confirmation" name="sales_delete_confirmation" value={confirmation} onValueChange={setConfirmation} disabled={deleting} required />
+        </> : <p className={styles.muted}>There are no imported leads to delete in this source.</p>}
+      </>}
+      {error && <div role="alert" className={styles.error}>{error}<button type="button" className={styles.secondary} disabled={loading || deleting} onClick={loadPreview}>Review again</button></div>}
+      <div className={styles.formActions}><button type="button" className={styles.secondary} disabled={deleting} onClick={onClose}>Cancel</button><button type="submit" className={styles.danger} disabled={loading || deleting || Boolean(error) || !preview?.count || confirmation.trim() !== required}><Trash2 size={16} />{deleting ? "Deleting..." : "Permanently delete"}</button></div>
+    </form>
   </Dialog>;
 }
 

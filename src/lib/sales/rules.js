@@ -1,5 +1,7 @@
 import * as chrono from "chrono-node";
 
+export const SALES_PAGE_SIZE = 50;
+
 export const SALES_STATUSES = [
   "New", ...Array.from({ length: 6 }, (_, i) => `RNR-${i + 1}`),
   "Call Busy", "Switched off", "Call back later", "Follow up",
@@ -31,6 +33,17 @@ export function phoneKey(value) {
   if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
   if (digits.length === 10) digits = `91${digits}`;
   return /^\d{8,15}$/.test(digits) ? `+${digits}` : "";
+}
+
+export function phoneNumbers(value) {
+  const numbers = new Map();
+  for (const part of String(value ?? "").split(/[;,/|\r\n]+/).map((v) => v.trim()).filter(Boolean)) {
+    const key = phoneKey(part);
+    if (!key) throw new Error("Enter valid phone numbers separated by semicolons, commas, slashes or new lines; include country codes outside India");
+    if (!numbers.has(key)) numbers.set(key, part);
+  }
+  if (!numbers.size) throw new Error("At least one valid phone number is required");
+  return [...numbers].map(([key, phone]) => ({ key, phone }));
 }
 
 export function normalizeStatus(value) {
@@ -80,9 +93,9 @@ export function validateLead(input) {
   const address = String(input.address || "").trim();
   if (address.length > 1000) throw new Error("Address must be at most 1000 characters");
   if (!name || name.length > 180) throw new Error("Name/Entity is required (maximum 180 characters)");
-  if (!phoneKey(phone)) throw new Error("Enter one valid phone number with its country code when outside India");
+  const numbers = phoneNumbers(phone);
   if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error("Enter a valid email address");
-  return { name, phone, phone_key: phoneKey(phone), email: email || null, address: address || null };
+  return { name, phone: numbers.map((n) => n.phone).join("; "), phone_key: numbers[0].key, phone_keys: numbers.map((n) => n.key), email: email || null, address: address || null };
 }
 
 export function validateActivity(body, lead, reference = new Date()) {
@@ -105,6 +118,15 @@ export function validateActivity(body, lead, reference = new Date()) {
   }
   if (kind !== "note" && status === "Meeting Completed" && !String(body.meeting_notes || "").trim()) throw new Error("Add the minutes of the meeting");
   return { ...body, kind, status, remark, due_at: due };
+}
+
+export const SALES_IMPORT_LIMIT = 10000;
+
+export function validateAssignees(value) {
+  if (!Array.isArray(value) || value.length > 100 || value.some((id) => typeof id !== "string" || !UUID_RE.test(id)) || new Set(value.map((id) => id.toLowerCase())).size !== value.length) {
+    throw new Error("Select up to 100 distinct valid users");
+  }
+  return value.map((id) => id.toLowerCase());
 }
 
 export function prepareImport(matrix) {
@@ -133,8 +155,8 @@ export function prepareImport(matrix) {
       const lead = validateLead(fields);
       const status = normalizeStatus(fields.status);
       if (!status) throw new Error(`Unknown status: ${fields.status}`);
-      if (seen.has(lead.phone_key)) throw new Error("Duplicate phone within this file");
-      seen.add(lead.phone_key);
+      if (lead.phone_keys.some((key) => seen.has(key))) throw new Error("Duplicate phone within this file");
+      lead.phone_keys.forEach((key) => seen.add(key));
       return [{ ...result, ...lead, status, remark: fields.remark.slice(0, 5000), done_by: fields.done_by.slice(0, 180), valid: true }];
     } catch (error) {
       return [{ ...result, name: String(row[mapping.name] || ""), phone: String(row[mapping.phone] || ""), valid: false, error: error.message }];

@@ -8,6 +8,6 @@ export async function GET(request) {
   try {
     const { data, error } = await ctx.supabase.rpc("sales_list_sources");
     if (error) throw error;
-    return salesJson({ sources: data || [] });
+    return salesJson({ sources: (data || []).filter((source) => source.name?.trim().toLowerCase() !== "manual" || Number(source.lead_count) > 0) });
   } catch (error) { return salesError(error); }
 }

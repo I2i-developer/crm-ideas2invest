@@ -9,6 +9,7 @@ import { authFetch } from "@/lib/authFetch";
 import { supabase } from "@/lib/supabaseClient";
 import CrmTooltip from "@/components/CrmTooltip";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
+import { canReceiveNotification } from "@/lib/notifications/audience";
 
 export default function NotificationIcon({ profile = null }) {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function NotificationIcon({ profile = null }) {
               toastEnabledRef.current &&
               payload.eventType === "INSERT" &&
               payload.new?.id &&
+              canReceiveNotification(profile?.role, payload.new) &&
               !seenToastIds.current.has(payload.new.id)
             ) {
               seenToastIds.current.add(payload.new.id);
