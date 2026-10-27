@@ -24,6 +24,7 @@ self.addEventListener("push", (event) => {
     icon: payload.icon || "/images/logo/logo.png",
     badge: payload.badge || "/images/logo/logo.png",
     tag: payload.tag || payload.notificationId || "crm-notification",
+    silent: false,
     data: {
       url: payload.url || "/notifications",
       notificationId: payload.notificationId || null,

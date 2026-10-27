@@ -18,6 +18,7 @@ export default function FormSelect({
   className = "",
   isMulti = false,
   isSearchable = false,
+  filterOption,
 }) {
   const [isDark, setIsDark] = useState(false);
 
@@ -73,6 +74,7 @@ export default function FormSelect({
         }}
         isMulti={isMulti}
         isSearchable={isSearchable}
+        filterOption={filterOption}
         closeMenuOnSelect={!isMulti}
         hideSelectedOptions={false}
         isClearable={!required && !includeAll}

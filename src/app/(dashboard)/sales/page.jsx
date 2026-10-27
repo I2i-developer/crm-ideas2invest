@@ -3,7 +3,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Bookmark, BookmarkCheck, CalendarDays, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, FileText, FolderOpen, History, Loader2, MapPin, MessageSquarePlus, Pencil, Phone, PhoneCall, Plus, RefreshCw, Save, Search, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, CalendarDays, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, FileText, FolderOpen, History, Loader2, MapPin, MessageCircle, MessageSquarePlus, Pencil, Phone, PhoneCall, Plus, RefreshCw, Save, Search, ShieldCheck, Trash2, Upload, UserRound, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import PageHeader from "@/components/PageHeader";
@@ -11,7 +11,7 @@ import CrmTooltip from "@/components/CrmTooltip";
 import SalesInsights from "./SalesInsights";
 import FormInput from "@/app/(dashboard)/admin/clients/components/FormInput";
 import FormSelect from "@/app/(dashboard)/admin/clients/components/FormSelect";
-import { SALES_STATUSES, SALES_PAGE_SIZE, CALL_STATUSES, FOLLOWUP_STATUSES, istDate, toIstInput, fromIstInput, suggestedFollowup, phoneNumbers } from "@/lib/sales/rules";
+import { SELECTABLE_SALES_STATUSES, SALES_PAGE_SIZE, CALL_STATUSES, FOLLOWUP_STATUSES, callStatusMatches, whatsappUrl, istDate, toIstInput, fromIstInput, suggestedFollowup, phoneNumbers } from "@/lib/sales/rules";
 import styles from "./sales.module.css";
 
 const VIEWS = [{ id: "leads", label: "Calling Queue", icon: PhoneCall }, { id: "followups", label: "Follow-ups", icon: CalendarClock }, { id: "calendar", label: "Meetings", icon: CalendarDays }, { id: "eod", label: "Daily EOD", icon: ClipboardList }];
@@ -110,6 +110,8 @@ function LeadAddress({ lead, editable = true, onSaved }) {
 
 export default function SalesWorkspace() {
   const [view, setView] = useState("leads");
+  const [callMetric, setCallMetric] = useState("dialed"), [callPage, setCallPage] = useState(1);
+  const [calls, setCalls] = useState({ rows: [], total: 0 }), [callsLoading, setCallsLoading] = useState(false), [callsError, setCallsError] = useState("");
   const [queue, setQueue] = useState({ leads: [], users: [], total: 0, role: "", viewer: {} });
   const [filters, setFilters] = useState({ search: "", status: "", owner: "", due: "", archived: "", source: "" });
   const [sources, setSources] = useState([]);
@@ -293,7 +295,7 @@ export default function SalesWorkspace() {
     return () => { alive = false; };
   }, [queue.role, admin, view, revision, eodDate, filters.owner, filters.source, followupPage]);
 
-  function changeFilter(key, value) { setSelectedIds([]); setPage(1); setFollowupPage(1); setFilters((f) => ({ ...f, [key]: value })); }
+function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(1); setFollowupPage(1); setFilters((f) => ({ ...f, [key]: value })); }
   function changeSource(id) {
     setProgress(null); setInsights(null);
     requestSeq.current++;
@@ -322,7 +324,21 @@ export default function SalesWorkspace() {
     catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
   const totals = Object.fromEntries(METRICS.map(([key]) => [key, eod.reduce((sum, r) => sum + Number(r[key] || 0), 0)]));
+  useEffect(() => {
+    if (view !== "calls" || !filters.source) return;
+    let alive = true;
+    setCallsLoading(true); setCallsError("");
+    const params = new URLSearchParams({ source: filters.source, date: eodDate, metric: callMetric, page: String(callPage), ...(admin && filters.owner && filters.owner !== "unassigned" ? { owner: filters.owner } : {}) });
+    api(`/calls?${params}`).then((data) => { if (alive) setCalls(data); })
+      .catch((e) => { if (alive) setCallsError(e.message); })
+      .finally(() => { if (alive) setCallsLoading(false); });
+    return () => { alive = false; };
+  }, [view, filters.source, filters.owner, admin, eodDate, callMetric, callPage, revision]);
   const activeFilters = Object.entries(filters).filter(([key, value]) => key !== "source" && value).length;
+  useEffect(() => {
+    if (view !== "calls") return;
+    document.querySelector("[data-call-activity]")?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [view, callMetric]);
   function protectCopy(e) { if (!["INPUT", "TEXTAREA"].includes(e.target.tagName) && !e.target.isContentEditable) e.preventDefault(); }
 
   return (
@@ -346,7 +362,7 @@ export default function SalesWorkspace() {
         {sourceError && <p role="alert" className={styles.error}>{sourceError}</p>}
         {/* <div className={styles.confidential}><ShieldCheck size={14} /><span>Confidential</span><span className={styles.watermark}>{queue.viewer.name || "Authorized CRM user"} · {viewedAt}</span></div> */}
         <div className={styles.metricHeading}><span>Call activity · {fmt(`${eodDate}T00:00:00+05:30`, true)}</span><small>Recorded attempts, not unique leads</small></div>
-        <div className={styles.metrics}>{METRICS.map(([key, label]) => <div key={key} className={styles.metric}><span>{label}</span><strong>{resourceLoading ? "-" : totals[key]}</strong></div>)}</div>
+        <div className={styles.metrics}>{METRICS.map(([key, label]) => <button type="button" key={key} className={styles.metric} disabled={!filters.source || resourceLoading} aria-pressed={view === "calls" && callMetric === key} aria-label={`View ${label.toLowerCase()} calls`} onClick={() => { setCallMetric(key); setCallPage(1); setView("calls"); }}><span>{label}</span><strong>{resourceLoading ? "-" : totals[key]}</strong></button>)}</div>
         {filters.source && <SalesInsights data={insights} loading={insightsLoading} error={insightsError} onRetry={refresh} />}
         <nav className={styles.tabs} aria-label="Sales views">{VIEWS.map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? styles.activeTab : ""} aria-current={view === id ? "page" : undefined} onClick={() => { setView(id); const url = new URL(window.location.href); url.searchParams.set("view", id); window.history.replaceState(null, "", url); }}><Icon size={16} />{label}</button>)}</nav>
 
@@ -355,7 +371,7 @@ export default function SalesWorkspace() {
           {view === "leads" && <>
             <div className={styles.filters}>
               <div className={styles.search}><Search size={17} /><input aria-label="Search leads" placeholder="Search name, phone or email" value={filters.search} onChange={(e) => changeFilter("search", e.target.value)} /></div>
-              <FormSelect name="sales_status" value={filters.status} options={SALES_STATUSES} includeAll allLabel="All statuses" onValueChange={(v) => changeFilter("status", v)} />
+              <FormSelect name="sales_status" value={filters.status} options={SELECTABLE_SALES_STATUSES} includeAll allLabel="All statuses" onValueChange={(v) => changeFilter("status", v)} />
               {admin && <FormSelect name="assigned_to" value={filters.owner} options={[{ value: "unassigned", label: "Unassigned" }, ...ownerOptions]} includeAll allLabel="All owners" onValueChange={(v) => changeFilter("owner", v)} />}
               <label className={styles.check}><input type="checkbox" checked={filters.due === "overdue"} onChange={(e) => changeFilter("due", e.target.checked ? "overdue" : "")} />Overdue</label>
               {admin && <label className={styles.check}><input type="checkbox" checked={filters.archived === "true"} onChange={(e) => changeFilter("archived", e.target.checked ? "true" : "")} />Archived</label>}
@@ -383,6 +399,18 @@ export default function SalesWorkspace() {
             </> : <div className={styles.empty}><PhoneCall size={28} /><h3>No leads found</h3><p>{admin ? "Add a lead or import a calling sheet." : "Your assigned leads will appear here."}</p></div>}
           </>}
 
+          {view === "calls" && <section data-call-activity className={styles.callActivityPanel} aria-label="Filtered call activity">
+            <div className={styles.calendarToolbar}>
+              <div><h2>{METRICS.find(([key]) => key === callMetric)?.[1]}</h2><p className={styles.muted}>{fmt(`${eodDate}T00:00:00+05:30`, true)} / {calls.total} call attempts</p></div>
+<div className={styles.actions}><FormInput label="Activity date" name="call_activity_date" type="date" required value={eodDate} maxDate={istDate()} onValueChange={(date) => { if (!date) return; setEodDate(date); setCallPage(1); }} /><button className={styles.secondary} onClick={() => setView("leads")}><ChevronLeft size={16} />Calling Queue</button></div>
+            </div>
+            {callsError ? <p role="alert" className={styles.error}>{callsError}<button className={styles.secondary} onClick={refresh}>Retry</button></p> : callsLoading ? <div className={styles.empty}>Loading call activity...</div> : calls.rows.length ? calls.rows.map((call) => <article className={styles.callActivityRow} key={call.id}>
+              <div>{call.lead_id ? <button className={styles.name} onClick={() => openLead(call.lead_id)}>{call.name}</button> : <strong>{call.name}</strong>}<p className={styles.muted}>{call.done_by} / {fmt(call.created_at)}</p></div>
+              <Status value={call.status} /><p className={styles.callActivityRemark}>{call.remark || "-"}</p>
+              {call.lead_id && <button className={`${styles.secondary} ${styles.openAction}`} onClick={() => openLead(call.lead_id)}>Open lead<ChevronRight size={16} /></button>}
+            </article>) : <div className={styles.empty}>No matching calls for this date.</div>}
+            {!callsLoading && !callsError && <Pager page={callPage} total={calls.total} pageSize={SALES_PAGE_SIZE} onChange={setCallPage} />}
+          </section>}
           {view === "followups" && <section>
             {resourceError && <p className={styles.error} role="alert">{resourceError}</p>}
             {resourceLoading ? <div className={styles.empty}>Loading follow-ups...</div> : followups.followups.length ? followups.followups.map((f) => <article key={f.id} className={styles.followupRow}>
@@ -411,7 +439,7 @@ export default function SalesWorkspace() {
         {leadId && <Dialog title={detail?.lead.name || "Lead details"} wide onClose={closeLead}>
           {detailLoading ? <div className={styles.empty}><Loader2 className={styles.spinner} />Loading lead...</div> : detail ? <>
             <div className={styles.leadOverview}><Status value={detail.lead.status} /><span className={styles.muted}>Source: {sources.find((s) => s.id === detail.lead.source_id)?.name || detail.lead.source}</span><span className={styles.muted}>Assigned to: {detail.lead.assigned_names?.join(", ") || detail.lead.assigned_name}</span><span className={styles.muted}>Meeting coordinator: {detail.lead.assigned_name}</span><span className={styles.muted}>RNR attempts: {detail.lead.rnr_count}/6</span></div>
-            <div className={styles.contactBand}>{phoneNumbers(detail.lead.phone).map((number) => <a key={number.key} href={`tel:${number.key}`}><Phone size={16} />{number.phone}</a>)}{detail.lead.email && <span>{detail.lead.email}</span>}</div>
+            <div className={styles.contactBand}>{phoneNumbers(detail.lead.phone).map((number) => <span key={number.key} className={styles.phoneContact}><a href={`tel:${number.key}`}><Phone size={16} />{number.phone}</a><CrmTooltip content={`WhatsApp ${number.phone}`}><a className={styles.whatsappLink} href={whatsappUrl(number.key)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${number.phone}`}><MessageCircle size={16} />WhatsApp</a></CrmTooltip></span>)}{detail.lead.email && <span>{detail.lead.email}</span>}</div>
             <div className={styles.detailSection}><h3>Address</h3><LeadAddress lead={detail.lead} editable={admin || !detail.lead.archived_at} onSaved={addressSaved} /></div>
             <div className={styles.actions}>
               {!detail.lead.archived_at && (!progress?.bookmark || progress.bookmark.id === detail.lead.id) && <button className={`${styles.secondary} ${styles.bookmarkAction}`} disabled={bookmarkBusy} onClick={() => bookmarkLead(detail.lead)}>{progress?.bookmark?.id === detail.lead.id ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}{progress?.bookmark?.id === detail.lead.id ? "Remove bookmark" : "Bookmark lead"}</button>}
@@ -488,8 +516,8 @@ function ActivityDialog({ lead, preset, onClose, onSaved }) {
   }
   return <Dialog title={noteOnly ? "Add remark" : preset === "call" ? "Log call" : form.status} onClose={() => { if (!saving) onClose(); }}><form onSubmit={save} className={styles.form}>
     <div className={styles.contactBand}><strong>{lead.name}</strong><span>{lead.phone}</span></div>
-    {!noteOnly && preset === "call" && <FormSelect label="Call status" name="sales_call_status" value={form.status} options={CALL_STATUSES.map((s) => ({ value: s, label: s === "RNR" ? `RNR-${Math.min(6, lead.rnr_count + 1)}` : s }))} onValueChange={(v) => set("status", v)} />}
-    <FormInput label="Remark" name="sales_call_remark" value={form.remark} onValueChange={(v) => set("remark", v)} required multiline rows={3} voice />
+    {!noteOnly && preset === "call" && <FormSelect label="Call status" name="sales_call_status" value={form.status} options={CALL_STATUSES.map((s) => ({ value: s, label: s === "RNR" ? `RNR-${Math.min(6, lead.rnr_count + 1)}` : s }))} onValueChange={(v) => set("status", v)} isSearchable filterOption={callStatusMatches} required />}
+    <FormInput label="Remark" name="sales_call_remark" value={form.remark} onValueChange={(v) => set("remark", v)} required={preset !== "call"} multiline rows={3} voice />
     {!noteOnly && (needsFollowup || automatic || form.status === "RNR") && <div>
       {automatic ? <p className={styles.scheduleHint}><CalendarClock size={16} />Automatic reminder: {fmt(suggested)}</p> : <>
         {needsFollowup && suggested && <button type="button" className={styles.suggested} onClick={() => set("due", toIstInput(suggested))}><CalendarClock size={15} />Use suggested time: {fmt(suggested)}</button>}

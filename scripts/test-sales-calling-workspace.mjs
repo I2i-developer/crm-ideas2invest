@@ -33,6 +33,10 @@ test("calling APIs validate IDs, bind bookmarks to authenticated RPCs and hide o
   assert.equal((await insightRoute.GET(new Request("https://crm.test/api/sales/insights?source=bad"))).status,400);
   await insightRoute.GET(new Request(`https://crm.test/api/sales/insights?source=${admin}`));
   assert.equal(call.name,"sales_calling_insights"); assert.equal(call.args.p_source,admin);
+  const callsRoute = await load("src/app/api/sales/calls/route.js",mocks);
+  assert.equal((await callsRoute.GET(new Request(`https://crm.test/api/sales/calls?source=${admin}&metric=invalid`))).status,400);
+  await callsRoute.GET(new Request(`https://crm.test/api/sales/calls?source=${admin}&metric=connected&date=2026-10-24&page=2`));
+  assert.deepEqual(call,{name:"sales_call_activity",args:{p_source:admin,p_metric:"connected",p_date:"2026-10-24",p_owner:null,p_page:2}});
 });
 
 const PGlite = process.env.PGLITE_MODULE ? require(process.env.PGLITE_MODULE).PGlite : null;
@@ -139,5 +143,25 @@ test("personal bookmarks, legacy last-call resume, page location and full-source
     await bookmark(null); assert.equal((await state()).bookmark,null);
     await actor(other); assert.equal((await state()).bookmark.id,leads[1].id); assert.equal((await state()).last_call,null);
     await actor(ops); await assert.rejects(state(),/Forbidden/); await assert.rejects(bookmark(leads[0].id),/Forbidden/); await assert.rejects(rpc("sales_calling_insights",[batch.source_id,null]),/Forbidden/);
+    await db.exec("RESET ROLE");
+    const snapshot = (await db.query("SELECT to_jsonb(a) row FROM sales_activities a ORDER BY id")).rows;
+    const update = await readFile(new URL("supabase/migrations/202610270001_sales_calling_updates.sql",root),"utf8");
+    await db.exec(update); await db.exec(update);
+    assert.deepEqual((await db.query("SELECT to_jsonb(a) row FROM sales_activities a ORDER BY id")).rows,snapshot);
+    await actor(sales);
+    const today = (await db.query("SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date::text AS current_day")).rows[0].current_day;
+    assert.equal((await rpc("sales_call_activity",[batch.source_id,today,"dialed",null,1])).total,2);
+    assert.equal((await rpc("sales_call_activity",[batch.source_id,today,"connected",null,1])).total,1);
+    assert.equal((await rpc("sales_call_activity",[batch.source_id,today,"interested",null,1])).total,1);
+    await assert.rejects(rpc("sales_call_activity",[batch.source_id,today,"dialed",other,1]),/Forbidden/);
+    await call(leads[3],1,"Call Busy","call",{remark:""});
+    await assert.rejects(call(leads[4],1,"New","note",{remark:""}),/remark/);
+    await assert.rejects(call(leads[4],1,"Do Not Call","call",{remark:""}),/no longer/);
+    insight = await rpc("sales_calling_insights",[batch.source_id,null]);
+    assert.ok(!insight.pipeline.some((row) => row.label === "Not called"));
+    assert.equal(insight.pipeline.reduce((n,row) => n+row.value,0),4);
+    await actor(admin);
+    const teamCalls = await rpc("sales_call_activity",[batch.source_id,today,"dialed",null,1]);
+    assert.equal(teamCalls.total,4); assert.equal(teamCalls.rows.length,4);
   } finally { await db.close(); }
 });

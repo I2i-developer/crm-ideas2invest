@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from "lucide-react";
 import VoiceInputButton from "@/components/VoiceInputButton";
+import { parseManualDate, formatManualDate, formatDateDraft } from "@/lib/dateInput";
+import styles from "./DateInput.module.css";
 
 const TEMPORAL_TYPES = new Set(["date", "datetime-local", "time", "month"]);
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -14,7 +17,14 @@ function pad(value) {
 }
 
 function dateKey(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${String(date.getFullYear()).padStart(4, "0")}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function calendarDate(year, month, day = 1) {
+  const date = new Date(0);
+  date.setHours(0, 0, 0, 0);
+  date.setFullYear(year, month, day);
+  return date;
 }
 
 function monthKey(date) {
@@ -36,8 +46,11 @@ function parseDateValue(value) {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!match) return null;
   const [, year, month, day] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (!parseManualDate(`${day}/${month}/${year}`)) return null;
+  const date = new Date(0);
+  date.setHours(0, 0, 0, 0);
+  date.setFullYear(Number(year), Number(month) - 1, Number(day));
+  return date;
 }
 
 function parseMonthValue(value) {
@@ -45,7 +58,7 @@ function parseMonthValue(value) {
   const match = String(value).match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
   const [, year, month] = match;
-  const date = new Date(Number(year), Number(month) - 1, 1);
+  const date = calendarDate(Number(year), Number(month) - 1);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -95,9 +108,9 @@ function displayTemporalValue(type, value) {
 }
 
 function buildCalendarDays(year, month) {
-  const firstDate = new Date(year, month, 1);
+  const firstDate = calendarDate(year, month);
   const mondayOffset = (firstDate.getDay() + 6) % 7;
-  const start = new Date(year, month, 1 - mondayOffset);
+  const start = calendarDate(year, month, 1 - mondayOffset);
 
   return Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start);
@@ -107,6 +120,7 @@ function buildCalendarDays(year, month) {
 }
 
 function TemporalInput({
+  label,
   id,
   name,
   type,
@@ -121,7 +135,11 @@ function TemporalInput({
   maxDate,
 }) {
   const wrapperRef = useRef(null);
+  const popoverRef = useRef(null), controlRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const [draft, setDraft] = useState(formatManualDate(value)), [dateError, setDateError] = useState("");
+  const [editingMonthYear, setEditingMonthYear] = useState(false), [yearDraft, setYearDraft] = useState("");
   const selectedDate = useMemo(
     () => (type === "month" ? parseMonthValue(value) : parseDateValue(value)),
     [type, value]
@@ -137,6 +155,35 @@ function TemporalInput({
   const [viewMonth, setViewMonth] = useState(initialViewDate.getMonth());
 
   useEffect(() => {
+    setDraft(formatManualDate(value)); setDateError("");
+    controlRef.current?.setCustomValidity?.("");
+  }, [value]);
+
+  useLayoutEffect(() => {
+    if (!open) { setPosition(null); return; }
+    const place = () => {
+      if (!wrapperRef.current || !popoverRef.current) return;
+      const anchor = wrapperRef.current.getBoundingClientRect(), viewport = window.visualViewport;
+      const leftEdge = viewport?.offsetLeft || 0, topEdge = viewport?.offsetTop || 0;
+      const width = Math.min(352, (viewport?.width || window.innerWidth) - 24);
+      const bottom = topEdge + (viewport?.height || window.innerHeight);
+      const height = Math.min(popoverRef.current.offsetHeight, bottom - topEdge - 24);
+      const below = bottom - anchor.bottom - 12, above = anchor.top - topEdge - 12;
+      const top = below >= height ? anchor.bottom + 8 : above >= height ? anchor.top - height - 8 : Math.max(topEdge + 12, bottom - height - 12);
+      setPosition({ top, left: Math.max(leftEdge + 12, Math.min(anchor.left, leftEdge + (viewport?.width || window.innerWidth) - width - 12)), width, maxHeight: bottom - topEdge - 24, fontFamily: window.getComputedStyle(wrapperRef.current).fontFamily });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(popoverRef.current); observer.observe(wrapperRef.current);
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    window.visualViewport?.addEventListener("resize", place); window.visualViewport?.addEventListener("scroll", place);
+    return () => {
+      observer.disconnect(); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true);
+      window.visualViewport?.removeEventListener("resize", place); window.visualViewport?.removeEventListener("scroll", place);
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (selectedDate) {
       setViewYear(selectedDate.getFullYear());
       setViewMonth(selectedDate.getMonth());
@@ -145,7 +192,7 @@ function TemporalInput({
 
   useEffect(() => {
     function handlePointerDown(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target) && !popoverRef.current?.contains(event.target)) {
         setOpen(false);
         onBlur?.(event);
       }
@@ -153,19 +200,21 @@ function TemporalInput({
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
+        event.preventDefault(); event.stopPropagation();
         setOpen(false);
+        controlRef.current?.focus({ preventScroll: true });
         onBlur?.(event);
       }
     }
 
     if (open) {
-      document.addEventListener("mousedown", handlePointerDown);
-      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener("pointerdown", handlePointerDown);
+      document.addEventListener("keydown", handleKeyDown, true);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [onBlur, open]);
 
@@ -180,11 +229,33 @@ function TemporalInput({
   function openPicker() {
     if (disabled) return;
     setOpen(true);
+    setEditingMonthYear(false);
     onFocus?.();
   }
 
+  function validateDraft(text, input, showError = false) {
+    const parsed = parseManualDate(text);
+    const message = text && !parsed ? "Enter a valid date in DD/MM/YYYY format." : parsed && maxDateKey && parsed > maxDateKey ? `Date cannot be after ${formatManualDate(maxDateKey)}.` : "";
+    input.setCustomValidity(message);
+    if (showError) setDateError(message); else setDateError("");
+    if (!message && parsed) emit(parsed);
+    else if (!text) emit("");
+  }
+
+  function commitYear(input) {
+    const year = Number(yearDraft);
+    if (!/^\d{4}$/.test(yearDraft) || year < 1 || year > 9999 || (maxDateKey && year > Number(maxDateKey.slice(0, 4)))) {
+      input.setCustomValidity("Enter a valid four-digit year within the allowed range.");
+      input.reportValidity(); return false;
+    }
+    input.setCustomValidity(""); setViewYear(year);
+    if (maxDateKey && year === Number(maxDateKey.slice(0, 4))) setViewMonth((month) => Math.min(month, Number(maxDateKey.slice(5, 7)) - 1));
+    return true;
+  }
+
   function moveMonth(direction) {
-    const next = new Date(viewYear, viewMonth + direction, 1);
+    const next = calendarDate(viewYear, viewMonth + direction);
+    if (next.getFullYear() < 1 || next.getFullYear() > 9999) return;
     if (direction > 0 && maxDateKey && dateKey(next) > maxDateKey) return;
     setViewYear(next.getFullYear());
     setViewMonth(next.getMonth());
@@ -203,7 +274,7 @@ function TemporalInput({
   }
 
   function selectMonth(monthIndex) {
-    emit(`${viewYear}-${pad(monthIndex + 1)}`);
+    emit(`${String(viewYear).padStart(4, "0")}-${pad(monthIndex + 1)}`);
     setViewMonth(monthIndex);
     setOpen(false);
   }
@@ -231,6 +302,7 @@ function TemporalInput({
 
   function setCurrentValue() {
     const now = new Date();
+    if (maxDateKey && ["date", "datetime-local"].includes(type) && dateKey(now) > maxDateKey) return;
     if (type === "date") emit(dateKey(now));
     if (type === "datetime-local") emit(`${dateKey(now)}T${timeKey(now)}`);
     if (type === "time") emit(timeKey(now));
@@ -238,12 +310,22 @@ function TemporalInput({
   }
 
   const pickerIcon = type === "time" ? <Clock3 size={18} /> : <CalendarDays size={18} />;
-  const nextMonth = new Date(viewYear, viewMonth + 1, 1);
+  const nextMonth = calendarDate(viewYear, viewMonth + 1);
   const nextMonthDisabled = Boolean(maxDateKey && dateKey(nextMonth) > maxDateKey);
 
   return (
     <div ref={wrapperRef} className="relative">
-      <button
+      {type === "date" ? <div className="relative">
+        <input ref={controlRef} id={id || name} type="text" inputMode="numeric" autoComplete="off" placeholder="DD/MM/YYYY" maxLength={10}
+          className={`${controlClass} min-h-[44px] pr-12`} value={draft} required={required} disabled={disabled}
+          aria-invalid={Boolean(dateError)} aria-describedby={dateError ? `${id || name}-date-error` : undefined}
+          onChange={(event) => { setOpen(false); const text = formatDateDraft(event.target.value); setDraft(text); validateDraft(text, event.target); }}
+          onClick={() => setOpen(false)} onFocus={(event) => { setOpen(false); onFocus?.(event); }} onBlur={(event) => { validateDraft(draft, event.target, true); onBlur?.(event); }}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); validateDraft(draft, event.currentTarget, true); } }} />
+        <button type="button" disabled={disabled} onClick={openPicker} aria-label={`Open ${label || name || "date"} calendar`} aria-haspopup="dialog" aria-expanded={open}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"><CalendarDays size={18} /></button>
+      </div> : <button
+        ref={controlRef}
         id={id || name}
         type="button"
         disabled={disabled}
@@ -269,12 +351,14 @@ function TemporalInput({
           )}
           {pickerIcon}
         </span>
-      </button>
+      </button>}
+      {dateError && <p id={`${id || name}-date-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-300">{dateError}</p>}
 
       <input type="hidden" name={name} value={value || ""} required={required} readOnly />
 
-      {open && !disabled && (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/12 dark:border-slate-700 dark:bg-slate-950 dark:shadow-black/40">
+      {open && !disabled && createPortal(
+        <div ref={popoverRef} role="dialog" aria-label={`${label || name || "Date"} calendar`} style={{ position: "fixed", zIndex: 10000, ...position, visibility: position ? "visible" : "hidden" }}
+          className={`${styles.calendar} w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 shadow-2xl shadow-slate-900/12 dark:border-slate-700 dark:shadow-black/40`}>
           {(type === "date" || type === "datetime-local") && (
             <div className="p-3">
               <div className="mb-3 flex items-center justify-between">
@@ -286,11 +370,18 @@ function TemporalInput({
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                  {new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(
-                    new Date(viewYear, viewMonth, 1)
-                  )}
-                </div>
+                {editingMonthYear ? <div className="flex min-w-0 items-center gap-2">
+                  <select aria-label="Calendar month" value={viewMonth} onChange={(event) => setViewMonth(Number(event.target.value))}
+                    className="min-w-0 rounded-lg border border-slate-200 bg-white p-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                    {MONTHS.map((month, index) => <option value={index} key={month} disabled={Boolean(maxDateKey && viewYear === Number(maxDateKey.slice(0, 4)) && index > Number(maxDateKey.slice(5, 7)) - 1)}>{month}</option>)}
+                  </select>
+                  <input aria-label="Calendar year" inputMode="numeric" maxLength={4} value={yearDraft} autoFocus
+                    className="w-20 rounded-lg border border-slate-200 bg-white p-1.5 text-center text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    onChange={(event) => { event.target.setCustomValidity(""); setYearDraft(event.target.value.replace(/\D/g, "")); }}
+                    onBlur={(event) => commitYear(event.target)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); if (commitYear(event.currentTarget)) setEditingMonthYear(false); } }} />
+                </div> : <button type="button" aria-label="Edit calendar month and year" onClick={() => { setYearDraft(String(viewYear).padStart(4, "0")); setEditingMonthYear(true); }} className="rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800">
+                  {new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(calendarDate(viewYear, viewMonth))}
+                </button>}
                 <button
                   type="button"
                   onClick={() => moveMonth(1)}
@@ -322,6 +413,7 @@ function TemporalInput({
                     <button
                       key={key}
                       type="button"
+                      aria-label={formatManualDate(key)}
                       onClick={() => selectDate(date)}
                       className={`h-9 rounded-xl text-sm font-medium transition ${
                         isSelected
@@ -445,7 +537,7 @@ function TemporalInput({
               Done
             </button>
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   );
@@ -540,6 +632,7 @@ export default function FormInput({
 
         {useTemporalPicker ? (
           <TemporalInput
+            label={label}
             id={name}
             name={name}
             type={type}

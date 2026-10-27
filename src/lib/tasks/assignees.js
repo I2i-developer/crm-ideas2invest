@@ -46,7 +46,7 @@ async function keepProfilesWithAuthUsers(serviceClient, profiles) {
   return checks.filter(Boolean);
 }
 
-export async function listAssignableTaskUsers(supabase) {
+export async function listAssignableTaskUsers(supabase, { actorRole, actorId } = {}) {
   const serviceClient = createTaskServiceClient();
   const readClient = serviceClient || supabase;
   const { data, error } = await readClient
@@ -56,7 +56,8 @@ export async function listAssignableTaskUsers(supabase) {
 
   if (error) throw new Error(error.message);
 
-  const assignableProfiles = (data || []).filter(isAssignableProfile);
+  const assignableProfiles = (data || []).filter((profile) => isAssignableProfile(profile) &&
+    (actorRole !== "sales" || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
   const profilesWithAuthUsers = await keepProfilesWithAuthUsers(serviceClient, assignableProfiles);
 
   return profilesWithAuthUsers
@@ -68,7 +69,7 @@ export async function listAssignableTaskUsers(supabase) {
     .sort((a, b) => displayName(a).localeCompare(displayName(b)));
 }
 
-export async function getValidTaskAssigneeIds(supabase, assigneeIds = []) {
+export async function getValidTaskAssigneeIds(supabase, assigneeIds = [], { actorRole, actorId } = {}) {
   const uniqueIds = [...new Set((Array.isArray(assigneeIds) ? assigneeIds : []).filter(Boolean))];
 
   if (uniqueIds.length === 0) return [];
@@ -82,7 +83,8 @@ export async function getValidTaskAssigneeIds(supabase, assigneeIds = []) {
 
   if (error) throw new Error(error.message);
 
-  const validProfiles = (data || []).filter(isAssignableProfile);
+  const validProfiles = (data || []).filter((profile) => isAssignableProfile(profile) &&
+    (actorRole !== "sales" || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
   const profilesWithAuthUsers = await keepProfilesWithAuthUsers(serviceClient, validProfiles);
   const validIds = profilesWithAuthUsers.map((profile) => profile.id);
 

@@ -8,7 +8,18 @@ export const SALES_STATUSES = [
   "Meeting Schedule", "Meeting Completed", "Follow up after meeting",
   "Not Interested", "Wrong Number", "Do Not Call", "Converted", "Meeting Cancelled",
 ];
-export const CALL_STATUSES = ["RNR", ...SALES_STATUSES.filter((s) => !["New", "Meeting Cancelled"].includes(s) && !s.startsWith("RNR-"))];
+export const CALL_STATUSES = ["RNR", ...SALES_STATUSES.filter((s) => !["New", "Meeting Cancelled", "Do Not Call"].includes(s) && !s.startsWith("RNR-"))];
+export const SELECTABLE_SALES_STATUSES = SALES_STATUSES.filter((s) => s !== "Do Not Call");
+export const CALL_METRICS = ["dialed", "connected", "interested", "non_interested", "meeting_scheduled"];
+
+export function callStatusMatches(option, input) {
+  return option.label.toLowerCase().startsWith(String(input || "").trim().toLowerCase());
+}
+
+export function whatsappUrl(phoneKey) {
+  const digits = String(phoneKey || "").replace(/\D/g, "");
+  return /^\d{8,15}$/.test(digits) ? `https://wa.me/${digits}` : null;
+}
 export const FOLLOWUP_STATUSES = ["Call back later", "Follow up", "Follow up after meeting"];
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -103,10 +114,11 @@ export function validateActivity(body, lead, reference = new Date()) {
   if (!["call", "note", "meeting"].includes(kind)) throw new Error("Invalid activity type");
   if (!UUID_RE.test(body.request_id || "")) throw new Error("A request identifier is required");
   const remark = String(body.remark || "").trim();
-  if (!remark || remark.length > 5000) throw new Error("Add a remark (maximum 5000 characters)");
+  if ((kind !== "call" && !remark) || remark.length > 5000) throw new Error("Add a remark (maximum 5000 characters; optional for calls)");
   let status = kind === "note" ? lead.status : String(body.status || "");
   if (status === "RNR") status = `RNR-${Math.min(6, (lead.rnr_count || 0) + 1)}`;
   if (!SALES_STATUSES.includes(status) || (kind === "call" && status === "New")) throw new Error("Select a valid call status");
+  if (kind !== "note" && status === "Do Not Call") throw new Error("Do Not Call is no longer available for new activity");
   if (kind === "call" && ["Do Not Call", "Converted"].includes(lead.status)) throw new Error("This lead is closed for calling; ask an admin to reopen it");
   let due = body.due_at || null;
   if (kind !== "note" && ["Call Busy", "Switched off"].includes(status)) due = suggestedFollowup(status, remark, reference);

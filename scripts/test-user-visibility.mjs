@@ -32,9 +32,10 @@ function database(seed, currentId = "admin") {
       const query = {
         select() { return this; }, order() { return this; }, limit() { return this; },
         gte() { return this; }, lte() { return this; }, lt() { return this; }, or() { return this; },
-        eq(key, value) { predicates.push((row) => row[key] === value); return this; },
+        eq(key, value) { predicates.push((row) => key.split(".").reduce((obj,k) => obj?.[k],row) === value); return this; },
         is(key, value) { return this.eq(key, value); },
         in(key, values) { predicates.push((row) => values.includes(row[key])); return this; },
+        contains(key, values) { predicates.push((row) => values.every((value) => key.split(".").reduce((obj,k) => obj?.[k],row)?.includes(value))); return this; },
         insert(value) { mode = "insert"; payload = value; return this; },
         update(value) { mode = "update"; payload = value; return this; },
         delete() { mode = "delete"; return this; },
@@ -120,11 +121,11 @@ function taskDatabase() {
   }, "sales");
 }
 
-test("Sales sees only assigned tasks and cannot create, delete or reassign them", async () => {
+test("Sales sees accessible tasks, creation requires assignees, and delete/reassignment stay restricted", async () => {
   const db = taskDatabase();
   const list = (await load("src/app/api/tasks/route.js", apiMocks(db))).namespace;
   assert.deepEqual((await list.GET(request())).data.tasks.map((task) => task.id), ["assigned"]);
-  assert.equal((await list.POST(request({ title: "Disallowed" }))).status, 403);
+  assert.equal((await list.POST(request({ title: "Missing assignee" }))).status, 400);
   const detail = (await load("src/app/api/tasks/[id]/route.js", apiMocks(db))).namespace;
   assert.equal((await detail.GET(request(), context("assigned"))).status, 200);
   assert.equal((await detail.GET(request(), context("private"))).status, 404);
@@ -180,6 +181,30 @@ test("Sales self-reminders are own-user scoped and cannot be assigned through a 
   assert.equal(response.data.reminder.user_id, "sales");
   const detail = (await load("src/app/api/self-reminders/[id]/route.js", dependencies)).namespace;
   assert.equal((await detail.PATCH(request({ title: "Not allowed" }), context("private"))).status, 403);
+});
+
+test("Self Reminders includes shared Calling Desk follow-ups without copying or leaking other leads", async () => {
+  const due = new Date(Date.now()+3600000).toISOString();
+  const db = database({profiles,client_meeting_reminders:[],sales_followups:[
+    {id:"shared",lead_id:"lead",user_id:"other",title:"Follow up",due_at:due,status:"Pending",lead:{id:"lead",name:"Shared lead",source_id:"source",assigned_user_ids:["sales","other"],archived_at:null}},
+    {id:"private",lead_id:"private",user_id:"other",title:"Private follow-up",due_at:due,status:"Pending",lead:{id:"private",name:"Private lead",source_id:"source",assigned_user_ids:["other"],archived_at:null}},
+  ]},"sales");
+  const api = (await load("src/app/api/self-reminders/route.js",{...apiMocks(db),"@/lib/reminders/selfReminders":{
+    SELF_REMINDER_SELECT:"*",SELF_REMINDER_PRIORITIES:["Medium"],SELF_REMINDER_STATUSES:["Pending"],
+    effectiveReminderAt:(row)=>row.reminder_at,generateDueSelfReminderNotifications:async()=>{},
+  }})).namespace;
+  const result = await api.GET(request());
+  assert.equal(result.status,200);assert.equal(result.data.summary.total,1);
+  assert.equal(result.data.reminders[0].id,"sales:shared");
+  assert.equal(result.data.reminders[0].origin,"calling_desk");
+  assert.match(result.data.reminders[0].link_url,/source=source&lead=lead/);
+  assert.equal(db.writes.length,0);assert.equal(db.tables.client_meeting_reminders.length,0);
+});
+
+test("Admin task list includes Sales-created tasks regardless of creator or assignee", async () => {
+  const db = database({profiles,tasks:[{id:"sales-task",title:"Sales task",created_by:"sales"},{id:"ops-task",title:"Operations task",created_by:"admin"}],task_assignments:[{task_id:"sales-task",user_id:"ops"},{task_id:"ops-task",user_id:"sales"}]},"admin");
+  const api = (await load("src/app/api/tasks/route.js",apiMocks(db))).namespace;
+  assert.deepEqual((await api.GET(request())).data.tasks.map((task)=>task.id),["sales-task","ops-task"]);
 });
 
 test("Sales can read their historical EOD reports after conversion, not another user's reports", async () => {

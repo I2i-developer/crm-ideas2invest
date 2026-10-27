@@ -13,6 +13,7 @@ export default function CreateTaskPage() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
+  const [role, setRole] = useState(null);
   const [prefillData, setPrefillData] = useState(null);
 
   useEffect(() => {
@@ -41,13 +42,17 @@ export default function CreateTaskPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [usersRes, clientsRes] = await Promise.all([
-        authFetch("/api/tasks/assignees"),
-        supabase.from("clients").select("id, full_name"),
-      ]);
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = user ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null };
+      setRole(profile?.role);
+      const usersRes = await authFetch("/api/tasks/assignees");
       const usersPayload = await usersRes.json();
       setUsers(usersRes.ok ? usersPayload.users || [] : []);
-      setClients(clientsRes.data || []);
+      if (!usersRes.ok) toast.error(usersPayload.error || "Unable to load task assignees");
+      if (profile?.role === "admin") {
+        const { data } = await supabase.from("clients").select("id, full_name");
+        setClients(data || []);
+      } else setPrefillData(null);
     }
     fetchData();
   }, []);
@@ -95,6 +100,7 @@ export default function CreateTaskPage() {
         initialData={prefillData}
         users={users}
         clients={clients}
+        allowClientLink={role === "admin"}
         onSubmit={handleSubmit}
         isEdit={false}
       />

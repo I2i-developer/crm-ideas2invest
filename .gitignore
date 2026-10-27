@@ -43,6 +43,8 @@ src/lib/google/vision-key.json
 !/supabase/migrations/202610250002_sales_calling_workspace.sql
 !/supabase/migrations/202610250003_sales_calling_refinements.sql
 !/supabase/migrations/202610250004_sales_quick_notes.sql
+!/supabase/migrations/202610260001_sales_team_tasks.sql
+!/supabase/migrations/202610270001_sales_calling_updates.sql
 /CRM_PRD.md
 /Updated DOB.xlsx
 /AMC'S FORM.xlsx

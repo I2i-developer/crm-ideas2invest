@@ -177,7 +177,7 @@ function textMentionsName(text, value) {
   return normalizedTokens(name).some((token) => haystack.includes(token));
 }
 
-export default function TaskForm({ initialData = null, users = [], clients = [], onSubmit, isEdit = false }) {
+export default function TaskForm({ initialData = null, users = [], clients = [], onSubmit, isEdit = false, allowClientLink = true }) {
   const initialTags = Array.isArray(initialData?.tags)
     ? initialData.tags.join(", ")
     : initialData?.tags || "";
@@ -248,6 +248,7 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
     const newErrors = {};
     if (!form.title.trim()) newErrors.title = "Title is required";
     if (!form.due_date) newErrors.due_date = "Due date is required";
+    if (!allowClientLink && !form.assigned_to.length) newErrors.assigned_to = "Select another Sales or Operations user";
     return newErrors;
   };
 
@@ -359,12 +360,13 @@ export default function TaskForm({ initialData = null, users = [], clients = [],
               placeholder="Select one or more team members"
               isMulti
             />
-            <p className={styles.hint}>Assign the task to admin, operations, or sales team members.</p>
+            <p className={styles.hint}>{allowClientLink ? "Assign the task to admin, operations, or sales team members." : "Assign to another Sales or Operations team member."}</p>
+            {errors.assigned_to && <p role="alert" className="text-sm text-red-600">{errors.assigned_to}</p>}
           </div>
 
-          <div className={styles.fullWidth}>
+          {allowClientLink && <div className={styles.fullWidth}>
             <FormSelect label="Link Client (Optional)" name="client_id" options={clientOptions} value={form.client_id} onChange={handleChange} />
-          </div>
+          </div>}
 
           <div className={styles.fullWidth}>
             <FormInput label="Tags" name="tags" placeholder="Enter tags separated by commas" value={form.tags} onChange={handleChange} />

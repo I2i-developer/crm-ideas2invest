@@ -345,7 +345,7 @@ export default function BirthdayCalendarPage() {
             className="fixed inset-0 z-40 h-screen bg-slate-950/35 backdrop-blur-sm"
             onClick={() => setShowAddBirthday(false)}
           />
-          <div className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label="Add client birthday" className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-pink-50 via-white to-blue-50 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Add client birthday</h2>
@@ -372,6 +372,7 @@ export default function BirthdayCalendarPage() {
                   label="Date of birth"
                   name="date_of_birth"
                   type="date"
+                  maxDate={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`}
                   required
                   value={birthdayForm.date_of_birth}
                   onValueChange={(value) => setBirthdayForm((current) => ({ ...current, date_of_birth: value }))}

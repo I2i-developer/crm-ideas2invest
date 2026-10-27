@@ -16,6 +16,17 @@ const r = module.namespace;
 const ref = new Date("2026-10-24T04:30:00Z"); // 10:00 IST
 const requestId = "aaaaaaaa-1111-4111-8111-111111111111";
 
+test("call statuses use prefix search, retire Do Not Call and permit calls without remarks", () => {
+  assert.ok(!r.CALL_STATUSES.includes("Do Not Call"));
+  assert.ok(r.SALES_STATUSES.includes("Do Not Call"));
+  assert.deepEqual(r.CALL_STATUSES.filter((label) => r.callStatusMatches({ label }, "c")), ["Call Busy", "Call back later", "Converted"]);
+  assert.equal(r.whatsappUrl("+919958418133"), "https://wa.me/919958418133");
+  const lead = {status:"New",rnr_count:0};
+  assert.equal(r.validateActivity({kind:"call",status:"Call Busy",request_id:requestId,remark:""},lead,ref).remark,"");
+  assert.throws(() => r.validateActivity({kind:"note",request_id:requestId,remark:""},lead,ref), /remark/);
+  assert.throws(() => r.validateActivity({kind:"call",status:"Do Not Call",request_id:requestId},lead,ref), /no longer/);
+});
+
 test("normalizes Indian phone formats for deduplication without losing international codes", () => {
   for (const phone of ["9876543210", "+91 98765 43210", "09876543210", "919876543210"]) assert.equal(r.phoneKey(phone), "+919876543210");
   assert.equal(r.phoneKey("+44 20 7946 0958"), "+442079460958");
@@ -102,7 +113,8 @@ test("sales page routing preserves admin/operations access and blocks sales from
   }
   for (const path of ["/sales", "/sales/dashboard", "/sales/eod-history", "/admin/meeting-notes", "/admin/settings", "/admin/reminders", "/admin/calculators", "/admin/document-requirements", "/admin/document-requirements/nri", "/notifications", "/dashboard/tasks", "/dashboard/tasks/assigned-task"]) assert.equal((await route("sales", path)).kind, "next");
   assert.equal((await route("sales", "/admin/company")).kind, "next");
-  for (const path of ["/admin/clients", "/admin/company/credentials", "/dashboard/tasks/create", "/dashboard/tasks/assigned-task/edit", "/operations/dashboard", "/system-gate"]) assert.equal((await route("sales", path)).path, "/sales/dashboard");
+  assert.equal((await route("sales", "/dashboard/tasks/create")).kind, "next");
+  for (const path of ["/admin/clients", "/admin/company/credentials", "/dashboard/tasks/assigned-task/edit", "/operations/dashboard", "/system-gate"]) assert.equal((await route("sales", path)).path, "/sales/dashboard");
   assert.equal((await route("operations", "/sales")).path, "/operations/dashboard");
   assert.equal((await route("operations", "/dashboard/tasks")).kind, "next");
   assert.equal((await route("admin", "/sales")).kind, "next");

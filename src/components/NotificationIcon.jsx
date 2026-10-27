@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import CrmTooltip from "@/components/CrmTooltip";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
 import { canReceiveNotification } from "@/lib/notifications/audience";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 export default function NotificationIcon({ profile = null }) {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function NotificationIcon({ profile = null }) {
   const [dismissingNotificationIds, setDismissingNotificationIds] = useState(() => new Set());
   const seenToastIds = useRef(new Set());
   const toastEnabledRef = useRef(true);
+  const playSound = useNotificationSound(profile?.id, profile?.notifications?.notification_sound !== false);
   const hiddenNotificationIdsRef = useRef(new Set());
   const hideTimersRef = useRef(new Map());
   const removeTimersRef = useRef(new Map());
@@ -58,14 +60,14 @@ export default function NotificationIcon({ profile = null }) {
             fetchNotifications();
 
             if (
-              toastEnabledRef.current &&
               payload.eventType === "INSERT" &&
               payload.new?.id &&
               canReceiveNotification(profile?.role, payload.new) &&
               !seenToastIds.current.has(payload.new.id)
             ) {
               seenToastIds.current.add(payload.new.id);
-              toast(payload.new.title || "New notification", { duration: 5000 });
+              if (toastEnabledRef.current) toast(payload.new.title || "New notification", { duration: 5000 });
+              playSound(payload.new.id);
             }
           }
         )
@@ -78,7 +80,7 @@ export default function NotificationIcon({ profile = null }) {
       mounted = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [fetchNotifications, profile]);
+  }, [fetchNotifications, profile, playSound]);
 
   useEffect(() => () => {
     hideTimersRef.current.forEach((timerId) => clearTimeout(timerId));

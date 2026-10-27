@@ -242,7 +242,22 @@
   padding: 14px;
   background: var(--surface);
   border-top: 3px solid var(--accent);
+  text-align: left;
+  min-width: 0;
+  transition: box-shadow 150ms, background-color 150ms;
 }
+.metric:hover:not(:disabled),.metric[aria-pressed="true"] { background: var(--soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.metric:disabled { opacity: .65; }
+.phoneContact { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.contactBand .whatsappLink { display: inline-flex; align-items: center; gap: 5px; color: #047857; border: 1px solid #a7f3d0; border-radius: 6px; padding: 5px 8px; }
+.contactBand .whatsappLink:hover { background: #ecfdf5; }
+:global(.dark) .contactBand .whatsappLink { color: #6ee7b7; border-color: #065f46; }
+:global(.dark) .contactBand .whatsappLink:hover { background: #064e3b; }
+.callActivityRow { display: grid; grid-template-columns: minmax(0,1.3fr) auto minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.callActivityRow > * { min-width: 0; overflow-wrap: anywhere; }
+.callActivityRemark { font-size: 13px; white-space: pre-wrap; }
+.callActivityPanel { scroll-margin-top: 100px; }
+@container (max-width: 680px) { .callActivityRow { grid-template-columns: minmax(0,1fr) auto; } }
 
 .metric:nth-child(2) {
   --accent: #0e7490;

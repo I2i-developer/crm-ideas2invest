@@ -188,10 +188,15 @@ export default function SelfRemindersPage() {
   }
 
   async function updateReminder(reminderId, payload, successMessage) {
-    const response = await authFetch(`/api/self-reminders/${reminderId}`, {
+    const calling = reminderId.startsWith("sales:");
+    const body = calling ? {
+      id: reminderId.slice(6), action: payload.status === "Completed" ? "complete" : "snooze",
+      due_at: payload.status === "Snoozed" ? new Date(Date.now() + (payload.snooze_minutes || 1440) * 60000).toISOString() : null,
+    } : payload;
+    const response = await authFetch(calling ? "/api/sales/followups" : `/api/self-reminders/${reminderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -350,6 +355,7 @@ export default function SelfRemindersPage() {
                           </Link>
                         )}
                         {reminder.notes && <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{reminder.notes}</p>}
+                        {reminder.origin === "calling_desk" && <Link href={reminder.link_url} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300"><Link2 size={14} />Calling Desk</Link>}
                       </div>
 
                       <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -363,19 +369,19 @@ export default function SelfRemindersPage() {
                             <Clock3 size={14} /> Snooze 1 day
                           </button>
                         )}
-                        {(reminder.status === "Completed" || reminder.status === "Cancelled") && (
+                        {reminder.origin !== "calling_desk" && (reminder.status === "Completed" || reminder.status === "Cancelled") && (
                           <button type="button" onClick={() => updateReminder(reminder.id, { status: "Pending", reminder_at: inputValueFromIso(reminder.reminder_at) || localDateTimeInput(30) }, "Reminder reopened")} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">
                             <RefreshCw size={14} /> Reopen
                           </button>
                         )}
-                        {reminder.status !== "Cancelled" && reminder.status !== "Completed" && (
+                        {reminder.origin !== "calling_desk" && reminder.status !== "Cancelled" && reminder.status !== "Completed" && (
                           <button type="button" onClick={() => updateReminder(reminder.id, { status: "Cancelled" }, "Reminder cancelled")} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                             <XCircle size={14} /> Cancel
                           </button>
                         )}
-                        <button type="button" onClick={() => deleteReminder(reminder)} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:border-red-300/40 dark:bg-slate-900 dark:text-red-100">
+                        {reminder.origin !== "calling_desk" && <button type="button" onClick={() => deleteReminder(reminder)} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:border-red-300/40 dark:bg-slate-900 dark:text-red-100">
                           <Trash2 size={14} /> Delete
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   </article>

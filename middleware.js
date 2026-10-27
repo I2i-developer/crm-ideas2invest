@@ -63,7 +63,7 @@ export async function middleware(request) {
       pathname.startsWith('/admin/document-requirements') || pathname === '/admin/company' ||
       pathname.startsWith('/notifications') ||
       ((pathname === '/dashboard/tasks' || pathname.startsWith('/dashboard/tasks/')) &&
-        !pathname.includes('/create') && !pathname.includes('/edit'))
+        !pathname.includes('/edit'))
     if (isSales && !salesAllowed) return NextResponse.redirect(new URL('/sales/dashboard', request.url))
     if (pathname.startsWith('/sales') && !isSales && !isAdmin) {
       return NextResponse.redirect(new URL(isOperations ? '/operations/dashboard' : '/login', request.url))

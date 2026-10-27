@@ -9,6 +9,7 @@ import {
   Settings,
   Sparkles,
   UploadCloud,
+  Volume2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PageHeader from "@/components/PageHeader";
@@ -17,6 +18,7 @@ import BrandLoader from "@/components/BrandLoader";
 import { supabase } from "@/lib/supabaseClient";
 import FormInput from "../clients/components/FormInput";
 import { formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
+import { testNotificationSound } from "@/lib/notifications/sound";
 
 const DEFAULT_NOTIFICATIONS = {
   task_assignments: true,
@@ -26,6 +28,7 @@ const DEFAULT_NOTIFICATIONS = {
   sip_followups: true,
   self_reminders: true,
   real_time_toasts: true,
+  notification_sound: true,
 };
 
 const DEFAULT_PREFERENCES = {
@@ -285,6 +288,7 @@ export default function SettingsPage() {
     }
 
     toast.success("Settings updated");
+    window.dispatchEvent(new CustomEvent("crm-notification-sound", { detail: { userId: profile.id, enabled: notifications.notification_sound !== false } }));
   };
 
   if (loading) return <BrandLoader label="Loading settings" />;
@@ -426,6 +430,15 @@ export default function SettingsPage() {
             checked={notifications.real_time_toasts}
             onChange={() => toggleNotification("real_time_toasts")}
           />
+          <ToggleRow
+            label="Notification sound"
+            description="Play a chime for new alerts while CRM is open. Background mobile alerts use your device sound settings."
+            checked={notifications.notification_sound}
+            onChange={() => toggleNotification("notification_sound")}
+          />
+          <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={async () => {
+            if (!await testNotificationSound()) toast.error("Sound is blocked or unavailable in this browser. Check your device sound settings.");
+          }}><Volume2 size={16} />Test notification sound</button>
         </div>
       </SettingPanel>
 

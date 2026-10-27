@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { canUseTasks } from "@/lib/auth/permissions";
+import { canUseTasks, canCreateTasks } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabaseServer";
 import { randomUUID } from "node:crypto";
 import { writeAuditLog } from "@/lib/audit/logger";
@@ -56,6 +56,11 @@ export async function GET(request) {
     }
 
     assignedTaskIds = (assignments || []).map((assignment) => assignment.task_id);
+    if (role === "sales") {
+      const { data: created, error: createdError } = await taskDb.from("tasks").select("id").eq("created_by", user.id);
+      if (createdError) return NextResponse.json({ error: createdError.message }, { status: 500 });
+      assignedTaskIds = [...new Set([...assignedTaskIds, ...(created || []).map((task) => task.id)])];
+    }
     if (assignedTaskIds.length === 0) {
       return NextResponse.json({ tasks: [] }, { status: 200 });
     }
@@ -124,7 +129,7 @@ export async function POST(request) {
     .single();
   const currentRole = String(profile?.role || "").trim().toLowerCase();
 
-  if (currentRole !== "admin") {
+  if (!canCreateTasks(currentRole)) {
     await writeAuditLog(supabase, {
       actor: user,
       profile,
@@ -132,7 +137,7 @@ export async function POST(request) {
       entityType: "task",
       request,
     });
-    return NextResponse.json({ error: "Forbidden: Admin only" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -147,6 +152,13 @@ export async function POST(request) {
     assigned_to,
     source_sip_event_id
   } = body;
+
+  if (currentRole === "sales" && (client_id || source_sip_event_id)) {
+    return NextResponse.json({ error: "Sales tasks cannot link back-office client or SIP records" }, { status: 403 });
+  }
+  if (currentRole === "sales" && (!Array.isArray(assigned_to) || !assigned_to.length)) {
+    return NextResponse.json({ error: "Assign the task to another Sales or Operations user" }, { status: 400 });
+  }
 
   if (!title) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -174,7 +186,7 @@ export async function POST(request) {
 
   let validAssigneeIds = [];
   try {
-    validAssigneeIds = await getValidTaskAssigneeIds(supabase, assigned_to);
+    validAssigneeIds = await getValidTaskAssigneeIds(supabase, assigned_to, { actorRole: currentRole, actorId: user.id });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
@@ -182,7 +194,9 @@ export async function POST(request) {
   const now = new Date();
   const taskNumber = `TSK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
-  const { data: task, error: taskError } = await taskDb
+  const { data: task, error: taskError } = currentRole === "sales"
+    ? await supabase.rpc("sales_create_team_task", { p: { title, description, category, priority, due_date, tags, task_number: taskNumber, assigned_to: validAssigneeIds } })
+    : await taskDb
     .from("tasks")
     .insert({
       task_number: taskNumber,
@@ -200,6 +214,12 @@ export async function POST(request) {
     .single();
 
   if (taskError) {
+    if (currentRole === "sales") {
+      if (taskError.code === "PGRST202" || taskError.message?.includes("does not exist")) {
+        return NextResponse.json({ error: "Apply 202610260001_sales_team_tasks.sql in Supabase before creating Sales tasks." }, { status: 503 });
+      }
+      return NextResponse.json({ error: taskError.message }, { status: taskError.code === "42501" ? 403 : 400 });
+    }
     return NextResponse.json({ error: taskError.message }, { status: 500 });
   }
 
@@ -209,7 +229,7 @@ export async function POST(request) {
       user_id: userId,
       assigned_by: user.id
     }));
-    const { error: assignmentError } = await taskDb.from("task_assignments").insert(assignments);
+    const { error: assignmentError } = currentRole === "sales" ? { error: null } : await taskDb.from("task_assignments").insert(assignments);
     if (assignmentError) {
       await taskDb.from("tasks").delete().eq("id", task.id);
       return NextResponse.json({ error: `Task assignment failed: ${assignmentError.message}` }, { status: 500 });

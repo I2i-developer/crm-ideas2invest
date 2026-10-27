@@ -190,7 +190,7 @@ export default function TaskDetailPage() {
             <select
               value={task.status}
               onChange={(e) => handleStatusUpdate(e.target.value)}
-              disabled={updating}
+              disabled={updating || (currentRole !== "admin" && !(task.task_assignments || []).some((assignment) => assignment.user_id === currentUserId))}
               className={styles.statusSelect}
               style={{ borderColor: STATUS_COLORS[task.status] }}
             >
@@ -214,7 +214,7 @@ export default function TaskDetailPage() {
           <Checklist
             taskId={task.id}
             items={task.task_checklist || []}
-            canEdit={true}
+            canEdit={currentRole === "admin" || (task.task_assignments || []).some((assignment) => assignment.user_id === currentUserId)}
           />
 
           <CommentSection

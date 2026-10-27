@@ -49,7 +49,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && !(role === "sales" && baseTask.created_by === user.id)) {
     const { data: assignment, error: assignmentError } = await taskDb
       .from("task_assignments")
       .select("id")

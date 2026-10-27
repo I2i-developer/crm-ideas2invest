@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
-import { getAuthContext, isAdmin } from "@/lib/auth/permissions";
+import { getAuthContext, canCreateTasks } from "@/lib/auth/permissions";
 import { listAssignableTaskUsers } from "@/lib/tasks/assignees";
 
 export async function GET(request) {
@@ -11,12 +11,12 @@ export async function GET(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isAdmin(role)) {
-    return NextResponse.json({ error: "Only admin can view task assignees" }, { status: 403 });
+  if (!canCreateTasks(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const users = await listAssignableTaskUsers(supabase);
+    const users = await listAssignableTaskUsers(supabase, { actorRole: role, actorId: user.id });
     return NextResponse.json({ users }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

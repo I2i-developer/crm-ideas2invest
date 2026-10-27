@@ -57,7 +57,7 @@ export async function GET(request) {
   const clientId = searchParams.get("client_id");
   const due = searchParams.get("due");
   const scope = searchParams.get("scope") || "mine";
-  const limit = Math.min(Number(searchParams.get("limit") || 250), 500);
+  const limit = Math.max(1, Math.min(Number.parseInt(searchParams.get("limit"), 10) || 250, 500));
 
   let query = supabase
     .from("client_meeting_reminders")
@@ -80,6 +80,23 @@ export async function GET(request) {
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
   let reminders = data || [];
+  if (["sales", "admin"].includes(role) && !clientId && status !== "Snoozed") {
+    let calling = supabase.from("sales_followups")
+      .select("id,lead_id,user_id,title,due_at,status,kind,created_at,lead:sales_leads!inner(id,name,source_id,assigned_user_ids,archived_at)")
+      .is("lead.archived_at", null).order("due_at", { ascending: true }).limit(limit);
+    if (!isAdmin(role) || scope !== "all") calling = calling.contains("lead.assigned_user_ids", [user.id]);
+    if (status === "active") calling = calling.eq("status", "Pending");
+    else if (status && status !== "all") calling = calling.eq("status", status);
+    const { data: followups, error: callingError } = await calling;
+    if (callingError) return NextResponse.json({ error: callingError.message }, { status: 500 });
+    reminders = [...reminders, ...(followups || []).map((item) => ({
+      id: `sales:${item.id}`, sales_followup_id: item.id, origin: "calling_desk",
+      title: item.title, reminder_at: item.due_at, status: item.status, priority: "Medium",
+      notes: item.lead.name, user_id: user.id, created_at: item.created_at,
+      link_url: `/sales?source=${item.lead.source_id}&lead=${item.lead_id}&view=followups`,
+    }))];
+    if (search) reminders = reminders.filter((item) => `${item.title} ${item.notes || ""}`.toLowerCase().includes(search.toLowerCase()));
+  }
 
   if (due === "now") {
     reminders = reminders.filter((item) => {
@@ -95,6 +112,8 @@ export async function GET(request) {
     });
   }
 
+  reminders.sort((a, b) => String(effectiveReminderAt(a)).localeCompare(String(effectiveReminderAt(b))));
+  reminders = reminders.slice(0, limit);
   return NextResponse.json({ reminders, summary: buildSummary(reminders), role }, { status: 200 });
 }
 

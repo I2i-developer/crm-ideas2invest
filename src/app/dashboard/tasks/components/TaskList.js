@@ -203,14 +203,14 @@ export default function TaskList() {
     <div className={styles.container}>
         <PageHeader
           eyebrow="Task Management"
-          title={String(currentRole || "").toLowerCase() === "admin" ? "Team Tasks" : "Assigned Tasks"}
+          title={currentRole === "admin" ? "Team Tasks" : currentRole === "sales" ? "My Tasks" : "Assigned Tasks"}
           description={
             String(currentRole || "").toLowerCase() === "admin"
               ? "Plan, assign, and follow work across clients and internal operations."
-              : "Track and update the tasks assigned to you."
+              : currentRole === "sales" ? "Track tasks assigned to you and tasks you have assigned to your team." : "Track and update the tasks assigned to you."
           }
         icon={ClipboardList}
-        actions={currentRole === "admin" && (
+        actions={["admin", "sales"].includes(currentRole) && (
           <Link href="/dashboard/tasks/create" className={styles.createBtn}>
             <Plus size={17} />
             <span>New Task</span>

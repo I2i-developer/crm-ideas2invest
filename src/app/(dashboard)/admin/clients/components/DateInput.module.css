@@ -1,0 +1,15 @@
+.calendar {
+  background-color: #fff;
+  color-scheme: light;
+}
+
+.calendar button,
+.calendar input,
+.calendar select {
+  font-family: inherit;
+}
+
+:global(.dark) .calendar {
+  background-color: #0f172a;
+  color-scheme: dark;
+}

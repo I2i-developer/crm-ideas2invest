@@ -227,6 +227,47 @@ device-level capture restrictions.
 
 ### Calling Desk Refinements
 
+Apply `202610270001_sales_calling_updates.sql` after the preceding migrations.
+It permits empty call remarks (notes/meeting activities still require remarks),
+retires Do Not Call for new activities and adds role-scoped, paged call history
+for the activity cards. No saved lead/activity/reminder rows are rewritten.
+Existing Do Not Call leads keep their status and closed-for-calling protection.
+
+The Lead status chart now counts contacted active leads, split into retry,
+follow-up, scheduled/completed meetings, not interested and other closed outcomes.
+Metric drill-downs use the same IST date, source, actor and outcome rules as EOD;
+they show call attempts, not a snapshot of current lead statuses. Inaccessible
+historical leads are masked while their call counts remain accurate.
+
+Calling Desk reminders appear in Self Reminders as a live read-through of
+sales_followups, not copied rows. Completion/snooze uses the existing Calling
+Desk API. The Calling Desk link opens the corresponding lead. Cancel/delete and
+reopen remain personal-reminder-only controls; calling history is not deleted.
+Sales task assignment and Admin visibility continue through the existing Tasks
+module. WhatsApp uses country-coded wa.me links per phone; no package is needed.
+
+Apply `202610260001_sales_team_tasks.sql` after the preceding migrations for
+Sales task creation. Sales can assign to other active Sales/Operations accounts,
+not themselves or Admin, and track/comment on their created tasks. Reassignment,
+full edits and deletion remain Admin-only. Client/SIP linking is not exposed to
+Sales. Creation and assignments commit atomically through an authenticated RPC;
+the assignment trigger also rejects forbidden recipients on direct writes.
+Existing task data is unchanged. No npm packages are required.
+
+Account Settings includes Notification sound and Test notification sound.
+Foreground chimes unlock on a user interaction and play once for each new
+allowed notification, independently of toast preferences. Older notifications
+and hidden-page events do not chime. Cross-tab deduplication uses Web Locks when
+available and a bounded device-local list of notification IDs. Background push
+requests the normal OS alert sound; browser autoplay restrictions, silent mode,
+Focus/Do Not Disturb and OS notification settings cannot be overridden by CRM.
+No extra database column is needed: the preference uses profiles.notifications.
+
+Browser/PWA code cannot guarantee black screenshots across devices. Do not
+describe print/copy restrictions or a visibility overlay as screenshot blocking.
+For capture controls, evaluate native wrappers/managed devices separately; native
+Android FLAG_SECURE is not available to a normal browser page.
+
 Apply `202610250004_sales_quick_notes.sql` after the preceding migrations to
 enable own-note Quick Notes access for Sales. Existing notes and Operations/Admin
 policies remain unchanged. No npm packages are required.
