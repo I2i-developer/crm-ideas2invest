@@ -3,6 +3,17 @@ import { createClient } from "@/lib/supabaseServer";
 import { getAuthContext, isAdmin, isOperations } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
 import importedBirthdays from "@/data/clientBirthdays.json";
+import { applyBirthdayChanges, validateBirthday } from "@/lib/birthdays";
+
+async function readBirthdayChanges(supabase) {
+  const changes = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase.from("birthday_changes").select("*").order("event_id").range(offset, offset + 999);
+    if (error) return { data: [], error };
+    changes.push(...data);
+    if (data.length < 1000) return { data: changes, error: null };
+  }
+}
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -41,6 +52,7 @@ export async function GET(request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const month = Number(searchParams.get("month")) || new Date().getMonth() + 1;
@@ -48,11 +60,10 @@ export async function GET(request) {
   const days = Number(searchParams.get("days")) || 14;
   const admin = isAdmin(role);
 
-  const [clientsRes, holdersRes, assignedTasksRes, manualBirthdaysRes] = await Promise.all([
+  const [clientsRes, holdersRes, assignedTasksRes, manualBirthdaysRes, changesRes] = await Promise.all([
     supabase
       .from("clients")
-      .select("id, client_code, full_name, email, mobile, date_of_birth, operations_owner, relationship_manager, client_category, tax_status, holding_pattern")
-      .eq("is_active", true),
+      .select("id, client_code, full_name, email, mobile, date_of_birth, operations_owner, relationship_manager, client_category, tax_status, holding_pattern"),
     supabase
       .from("client_holders")
       .select("id, client_id, holder_type, holder_order, full_name, email, mobile, date_of_birth, clients(id, client_code, full_name, email, mobile, operations_owner, tax_status, holding_pattern)")
@@ -65,7 +76,18 @@ export async function GET(request) {
       .from("manual_client_birthdays")
       .select("*")
       .order("created_at", { ascending: false }),
+    readBirthdayChanges(supabase),
   ]);
+
+  // Existing calendars stay readable until the additive migration is applied.
+  const migrationMissing = changesRes.error && ["42P01", "PGRST205"].includes(changesRes.error.code);
+  if (changesRes.error && !migrationMissing) return NextResponse.json({ error: "Unable to load birthday changes" }, { status: 500 });
+  for (const [source, result] of [["clients", clientsRes], ["holders", holdersRes], ["assigned tasks", assignedTasksRes], ["manual birthdays", manualBirthdaysRes]]) {
+    if (result.error) {
+      console.error(`Birthday source failed: ${source}`, result.error);
+      return NextResponse.json({ error: `Unable to load birthdays (${source})`, code: result.error.code }, { status: 500 });
+    }
+  }
 
   const assignedClientIds = new Set((assignedTasksRes.data || []).map((task) => task.client_id).filter(Boolean));
   const visibleClientIds = new Set(
@@ -154,7 +176,7 @@ export async function GET(request) {
     }
   }
 
-  const events = [...eventMap.values()].map((event) => {
+  const events = applyBirthdayChanges([...eventMap.values()], changesRes.data).map((event) => {
     const nextDate = nextBirthdayDate(event.date_of_birth);
     return {
       ...event,
@@ -178,7 +200,7 @@ export async function GET(request) {
       calendar_date: `${year}-${String(month).padStart(2, "0")}-${event.month_day.slice(3, 5)}`,
     }));
 
-  return NextResponse.json({ today, upcoming, calendar, events }, { status: 200 });
+  return NextResponse.json({ today, upcoming, calendar, events, can_manage: !migrationMissing }, { status: 200, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request) {
@@ -190,13 +212,16 @@ export async function POST(request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  const validated = validateBirthday(body);
+  if (validated.error) return NextResponse.json({ error: validated.error }, { status: 400 });
   const payload = {
     client_id: body.client_id || null,
-    person_name: String(body.person_name || "").trim(),
+    person_name: validated.person_name,
     client_name: String(body.client_name || body.person_name || "").trim() || null,
     person_type: String(body.person_type || "Client").trim() || "Client",
-    date_of_birth: body.date_of_birth || null,
+    date_of_birth: validated.date_of_birth,
     mobile: String(body.mobile || "").trim() || null,
     email: String(body.email || "").trim().toLowerCase() || null,
     notes: String(body.notes || "").trim() || null,
@@ -222,3 +247,43 @@ export async function POST(request) {
 
   return NextResponse.json({ birthday: data }, { status: 201 });
 }
+
+async function changeBirthday(request, deleted) {
+  const supabase = await createClient(request);
+  const { user, profile, role } = await getAuthContext(supabase);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(role) && !isOperations(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.id !== "string" || !body.id || body.id.length > 200) return NextResponse.json({ error: "Invalid birthday" }, { status: 400 });
+  const validated = deleted ? {} : validateBirthday(body);
+  if (validated.error) return NextResponse.json({ error: validated.error }, { status: 400 });
+
+  // Resolve IDs through the same role-scoped calendar, never trust a client ID.
+  const calendarResponse = await GET(request);
+  if (!calendarResponse.ok) return calendarResponse;
+  const calendar = await calendarResponse.json();
+  if (!calendar.can_manage) return NextResponse.json({ error: "Run migration 202610310001_birthday_management.sql before editing or deleting birthdays" }, { status: 409 });
+  const existing = calendar.events.find((event) => event.id === body.id);
+  if (!existing) return NextResponse.json({ error: "Birthday not found or no longer accessible" }, { status: 404 });
+  const payload = {
+    event_id: existing.id,
+    person_name: deleted ? existing.person_name : validated.person_name,
+    date_of_birth: deleted ? existing.date_of_birth : validated.date_of_birth,
+    deleted,
+    updated_by: user.id,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from("birthday_changes").upsert(payload, { onConflict: "event_id" }).select().single();
+  if (error) return NextResponse.json({ error: "Unable to save birthday changes" }, { status: 500 });
+  await writeAuditLog(supabase, {
+    actor: user, profile, request,
+    action: deleted ? "birthday_deleted" : "birthday_updated",
+    entityType: "birthday", entityId: existing.client_id || null,
+    metadata: { birthday_id: existing.id },
+    oldValue: existing, newValue: data,
+  });
+  return NextResponse.json({ success: true, birthday: data });
+}
+
+export async function PATCH(request) { return changeBirthday(request, false); }
+export async function DELETE(request) { return changeBirthday(request, true); }

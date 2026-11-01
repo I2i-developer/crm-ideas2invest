@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Cake, CalendarDays, Gift, Plus, Search, UserRound, X } from "lucide-react";
+import { Cake, CalendarDays, Gift, MoreHorizontal, Pencil, Plus, Search, Trash2, UserRound, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { authFetch } from "@/lib/authFetch";
 import FormInput from "../clients/components/FormInput";
 import FormSelect from "../clients/components/FormSelect";
 import PageHeader from "@/components/PageHeader";
 import { formatDateDDMonYYYY } from "@/lib/dateFormat";
+import CrmTooltip from "@/components/CrmTooltip";
+import styles from "./birthdays.module.css";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -60,46 +62,105 @@ export default function BirthdayCalendarPage() {
   const [showAddBirthday, setShowAddBirthday] = useState(false);
   const [savingBirthday, setSavingBirthday] = useState(false);
   const [birthdayForm, setBirthdayForm] = useState(EMPTY_BIRTHDAY_FORM);
+  const [editingBirthday, setEditingBirthday] = useState(null);
+  const [deletingBirthday, setDeletingBirthday] = useState(null);
+  const [canManage, setCanManage] = useState(null);
+  const [birthdayActionsId, setBirthdayActionsId] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
-  const loadBirthdays = useCallback(async () => {
+  const loadBirthdays = useCallback(async (targetMonth = month, targetYear = year) => {
     setLoading(true);
-    const response = await authFetch(`/api/birthdays?month=${month}&year=${year}&days=30`);
-    const data = await response.json();
-    if (response.ok) {
+    try {
+      const response = await authFetch(`/api/birthdays?month=${targetMonth}&year=${targetYear}&days=30`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load birthdays");
       setBirthdays(data.calendar || []);
       setAllBirthdays(data.events || []);
+      setCanManage(data.can_manage === true);
+      setLoadError("");
+    } catch (error) {
+      setCanManage(null);
+      setLoadError(error.message || "Unable to load birthdays");
+      toast.error(error.message || "Unable to load birthdays");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [month, year]);
 
   useEffect(() => {
     loadBirthdays();
   }, [loadBirthdays]);
 
+  const closeBirthdayDialog = useCallback(() => {
+    if (savingBirthday) return;
+    setShowAddBirthday(false);
+    setEditingBirthday(null);
+    setDeletingBirthday(null);
+    setBirthdayForm(EMPTY_BIRTHDAY_FORM);
+  }, [savingBirthday]);
+
+  useEffect(() => {
+    if (!showAddBirthday && !deletingBirthday) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event) => { if (event.key === "Escape") closeBirthdayDialog(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showAddBirthday, deletingBirthday, closeBirthdayDialog]);
+
   async function addBirthday(event) {
     event.preventDefault();
+    if (savingBirthday) return;
     setSavingBirthday(true);
-    const response = await authFetch("/api/birthdays", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(birthdayForm),
-    });
-    const data = await response.json().catch(() => ({}));
-    setSavingBirthday(false);
+    try {
+      const response = await authFetch("/api/birthdays", {
+        method: editingBirthday ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...birthdayForm, ...(editingBirthday ? { id: editingBirthday.id } : {}) }),
+      });
+      const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      toast.error(data.error || "Unable to add birthday");
-      return;
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to save birthday");
+      }
+
+      const birthdayDate = new Date(`${birthdayForm.date_of_birth}T00:00:00`);
+      setMonth(birthdayDate.getMonth() + 1);
+      setYear(now.getFullYear());
+      setSelectedDay(birthdayDate.getDate());
+      setBirthdayForm(EMPTY_BIRTHDAY_FORM);
+      setShowAddBirthday(false);
+      setEditingBirthday(null);
+      toast.success(editingBirthday ? "Birthday updated" : "Client birthday added");
+      await loadBirthdays(birthdayDate.getMonth() + 1, now.getFullYear());
+    } catch (error) {
+      toast.error(error.message || "Unable to save birthday");
+    } finally {
+      setSavingBirthday(false);
     }
+  }
 
-    const birthdayDate = new Date(`${birthdayForm.date_of_birth}T00:00:00`);
-    setMonth(birthdayDate.getMonth() + 1);
-    setYear(now.getFullYear());
-    setSelectedDay(birthdayDate.getDate());
-    setBirthdayForm(EMPTY_BIRTHDAY_FORM);
-    setShowAddBirthday(false);
-    toast.success("Client birthday added");
-    await loadBirthdays();
+  async function deleteBirthday() {
+    if (!deletingBirthday || savingBirthday) return;
+    setSavingBirthday(true);
+    try {
+      const response = await authFetch("/api/birthdays", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deletingBirthday.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Unable to delete birthday");
+      setDeletingBirthday(null);
+      toast.success("Birthday deleted");
+      await loadBirthdays();
+    } catch (error) {
+      toast.error(error.message || "Unable to delete birthday");
+    } finally {
+      setSavingBirthday(false);
+    }
   }
 
   const searchResults = useMemo(() => {
@@ -143,6 +204,7 @@ export default function BirthdayCalendarPage() {
   const days = buildCalendar(year, month);
   const selectedBirthdays = grouped[selectedDay] || [];
   const hasSearch = Boolean(search.trim());
+  const showToday = hasSearch || month !== now.getMonth() + 1 || year !== now.getFullYear() || selectedDay !== now.getDate();
   const todayCount = allBirthdays.filter((birthday) => birthday.days_until === 0).length;
   const monthCount = birthdays.length;
   const panelItems = hasSearch ? searchResults : selectedBirthdays;
@@ -194,16 +256,39 @@ export default function BirthdayCalendarPage() {
             className="w-28"
           />
 
+          <div className="flex flex-wrap items-center gap-2">
+          {showToday && <button
+            type="button"
+            onClick={() => {
+              const today = new Date();
+              setMonth(today.getMonth() + 1);
+              setYear(today.getFullYear());
+              setSelectedDay(today.getDate());
+              setSearch("");
+              setBirthdayActionsId(null);
+            }}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900"
+          >
+            <CalendarDays size={16} />
+            Today
+          </button>}
           <button
             type="button"
-            onClick={() => setShowAddBirthday(true)}
+            onClick={() => { setEditingBirthday(null); setBirthdayForm(EMPTY_BIRTHDAY_FORM); setShowAddBirthday(true); }}
             className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Plus size={16} />
             Add birthday
           </button>
+          </div>
         </div>
       </div>
+
+      {!loading && canManage === false && <p className="text-sm text-amber-700 dark:text-amber-300">Birthday editing requires database migration 202610310001_birthday_management.sql.</p>}
+      {!loading && loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        <span>{loadError}</span>
+        <button type="button" onClick={() => loadBirthdays()} className="rounded-lg border border-current px-3 py-1.5 font-semibold transition hover:bg-red-100 dark:hover:bg-red-900">Try again</button>
+      </div>}
 
       <div className="grid xl:grid-cols-[1fr_360px] gap-6">
         <div className="glass-card p-5 shadow-lg">
@@ -314,7 +399,10 @@ export default function BirthdayCalendarPage() {
             </p>
           ) : (
             panelItems.map((birthday) => (
-              <Link key={birthday.id} href={birthdayHref(birthday)} className="block rounded-2xl border border-pink-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-pink-200 hover:bg-pink-50/60">
+              <article key={birthday.id} data-actions-open={birthdayActionsId === birthday.id} onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setBirthdayActionsId(null);
+              }} onKeyDown={(event) => { if (event.key === "Escape") { setBirthdayActionsId(null); event.currentTarget.querySelector("a")?.focus(); } }} className={`${styles.birthdayCard} block rounded-2xl border border-pink-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-pink-200 hover:bg-pink-50/60`}>
+              <Link href={birthdayHref(birthday)} className="block min-w-0 rounded focus-visible:outline-2 focus-visible:outline-blue-500">
                 <div className="flex items-start gap-3">
                   <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-sm font-bold text-white">
                     {titleCase(birthday.person_name).charAt(0)}
@@ -332,6 +420,21 @@ export default function BirthdayCalendarPage() {
                   </p>
                 )}
               </Link>
+              {canManage && <>
+              <button type="button" className={styles.touchActionsToggle} aria-label={`Birthday actions for ${birthday.person_name}`} aria-expanded={birthdayActionsId === birthday.id} onClick={() => setBirthdayActionsId((current) => current === birthday.id ? null : birthday.id)}><MoreHorizontal size={20} /></button>
+              <div className={styles.birthdayActions}>
+                <CrmTooltip content="Edit birthday">
+                  <button type="button" aria-label={`Edit birthday for ${birthday.person_name}`} onClick={() => {
+                    setEditingBirthday(birthday);
+                    setBirthdayForm({ person_name: birthday.person_name, person_type: birthday.person_type, date_of_birth: birthday.date_of_birth });
+                    setShowAddBirthday(true);
+                  }} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:hover:bg-blue-900"><Pencil size={14} />Edit</button>
+                </CrmTooltip>
+                <CrmTooltip content="Delete birthday">
+                  <button type="button" aria-label={`Delete birthday for ${birthday.person_name}`} onClick={() => setDeletingBirthday(birthday)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:bg-red-950 dark:text-red-200 dark:hover:bg-red-900"><Trash2 size={14} />Delete</button>
+                </CrmTooltip>
+              </div></>}
+              </article>
             ))
           )}
         </div>
@@ -341,19 +444,20 @@ export default function BirthdayCalendarPage() {
         <>
           <button
             type="button"
-            aria-label="Close add birthday dialog"
+            aria-label="Close birthday dialog"
             className="fixed inset-0 z-40 h-screen bg-slate-950/35 backdrop-blur-sm"
-            onClick={() => setShowAddBirthday(false)}
+            onClick={closeBirthdayDialog}
           />
-          <div role="dialog" aria-modal="true" aria-label="Add client birthday" className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label={editingBirthday ? "Edit client birthday" : "Add client birthday"} className="fixed inset-x-3 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-xl -translate-y-1/2 overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-pink-50 via-white to-blue-50 px-5 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">Add client birthday</h2>
-                <p className="text-xs text-slate-500">Add a birthday maintained directly inside the CRM.</p>
+                <h2 className="text-lg font-semibold text-slate-950">{editingBirthday ? "Edit client birthday" : "Add client birthday"}</h2>
+                <p className="text-xs text-slate-500">{editingBirthday ? "Update the calendar entry. Client profile details remain unchanged." : "Add a birthday maintained directly inside the CRM."}</p>
               </div>
               <button
                 type="button"
-                onClick={() => setShowAddBirthday(false)}
+                onClick={closeBirthdayDialog}
+                aria-label="Close birthday editor"
                 className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white hover:text-slate-900"
               >
                 <X size={17} />
@@ -365,6 +469,7 @@ export default function BirthdayCalendarPage() {
                   label="Client name"
                   name="person_name"
                   required
+                  maxLength={200}
                   value={birthdayForm.person_name}
                   onValueChange={(value) => setBirthdayForm((current) => ({ ...current, person_name: value }))}
                 />
@@ -381,7 +486,8 @@ export default function BirthdayCalendarPage() {
               <div className="mt-5 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddBirthday(false)}
+                  onClick={closeBirthdayDialog}
+                  disabled={savingBirthday}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
@@ -391,13 +497,25 @@ export default function BirthdayCalendarPage() {
                   disabled={savingBirthday}
                   className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
                 >
-                  {savingBirthday ? "Adding..." : "Add birthday"}
+                  {savingBirthday ? "Saving..." : editingBirthday ? "Save changes" : "Add birthday"}
                 </button>
               </div>
             </form>
           </div>
         </>
       )}
+
+      {deletingBirthday && <>
+        <button type="button" aria-label="Close delete birthday dialog" onClick={closeBirthdayDialog} className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-sm" />
+        <div role="alertdialog" aria-modal="true" aria-labelledby="delete-birthday-title" aria-describedby="delete-birthday-description" className="fixed inset-x-3 top-1/2 z-50 mx-auto max-w-md -translate-y-1/2 rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+          <h2 id="delete-birthday-title" className="text-lg font-semibold text-gray-900 dark:text-white">Delete birthday?</h2>
+          <p id="delete-birthday-description" className="mt-2 break-words text-sm text-gray-600 dark:text-gray-300">Remove <strong>{deletingBirthday.person_name}</strong> from the birthday calendar for everyone? The client profile and documents will not be deleted.</p>
+          <div className="mt-5 flex justify-end gap-3">
+            <button type="button" autoFocus disabled={savingBirthday} onClick={closeBirthdayDialog} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">Cancel</button>
+            <button type="button" disabled={savingBirthday} onClick={deleteBirthday} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"><Trash2 size={15} />{savingBirthday ? "Deleting..." : "Delete birthday"}</button>
+          </div>
+        </div>
+      </>}
     </div>
   );
 }

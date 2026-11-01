@@ -54,7 +54,7 @@ export default function TasksLayout({ children }) {
   }, [loadProfile]);
 
   return (
-    <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
+    <div className="crm-shell flex min-w-0 font-sans bg-gray-50">
       <UsageSessionTracker />
       <Sidebar
         collapsed={collapsed}
@@ -63,7 +63,7 @@ export default function TasksLayout({ children }) {
         setMobileOpen={setMobileSidebarOpen}
         profile={profile}
       />
-      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
+      <div className="min-h-0 min-w-0 flex-1 flex flex-col overflow-hidden transition-all duration-300">
         <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-gray-50/95 px-2 sm:px-4 lg:px-4">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -78,7 +78,7 @@ export default function TasksLayout({ children }) {
           </div>
           <HeaderActions profile={profile} />
         </header>
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">
           {children}
         </main>
       </div>

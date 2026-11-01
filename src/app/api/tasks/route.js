@@ -56,7 +56,7 @@ export async function GET(request) {
     }
 
     assignedTaskIds = (assignments || []).map((assignment) => assignment.task_id);
-    if (role === "sales") {
+    if (["sales", "operations"].includes(role)) {
       const { data: created, error: createdError } = await taskDb.from("tasks").select("id").eq("created_by", user.id);
       if (createdError) return NextResponse.json({ error: createdError.message }, { status: 500 });
       assignedTaskIds = [...new Set([...assignedTaskIds, ...(created || []).map((task) => task.id)])];
@@ -153,10 +153,10 @@ export async function POST(request) {
     source_sip_event_id
   } = body;
 
-  if (currentRole === "sales" && (client_id || source_sip_event_id)) {
-    return NextResponse.json({ error: "Sales tasks cannot link back-office client or SIP records" }, { status: 403 });
+  if (currentRole !== "admin" && (client_id || source_sip_event_id)) {
+    return NextResponse.json({ error: "Only Admin-created tasks can link client or SIP records" }, { status: 403 });
   }
-  if (currentRole === "sales" && (!Array.isArray(assigned_to) || !assigned_to.length)) {
+  if (currentRole !== "admin" && (!Array.isArray(assigned_to) || !assigned_to.length)) {
     return NextResponse.json({ error: "Assign the task to another Sales or Operations user" }, { status: 400 });
   }
 
@@ -194,7 +194,7 @@ export async function POST(request) {
   const now = new Date();
   const taskNumber = `TSK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
-  const { data: task, error: taskError } = currentRole === "sales"
+  const { data: task, error: taskError } = currentRole !== "admin"
     ? await supabase.rpc("sales_create_team_task", { p: { title, description, category, priority, due_date, tags, task_number: taskNumber, assigned_to: validAssigneeIds } })
     : await taskDb
     .from("tasks")
@@ -214,9 +214,9 @@ export async function POST(request) {
     .single();
 
   if (taskError) {
-    if (currentRole === "sales") {
+    if (currentRole !== "admin") {
       if (taskError.code === "PGRST202" || taskError.message?.includes("does not exist")) {
-        return NextResponse.json({ error: "Apply 202610260001_sales_team_tasks.sql in Supabase before creating Sales tasks." }, { status: 503 });
+        return NextResponse.json({ error: "Apply the team task migrations through 202610270002_operations_team_tasks.sql in Supabase." }, { status: 503 });
       }
       return NextResponse.json({ error: taskError.message }, { status: taskError.code === "42501" ? 403 : 400 });
     }
@@ -229,7 +229,7 @@ export async function POST(request) {
       user_id: userId,
       assigned_by: user.id
     }));
-    const { error: assignmentError } = currentRole === "sales" ? { error: null } : await taskDb.from("task_assignments").insert(assignments);
+    const { error: assignmentError } = currentRole !== "admin" ? { error: null } : await taskDb.from("task_assignments").insert(assignments);
     if (assignmentError) {
       await taskDb.from("tasks").delete().eq("id", task.id);
       return NextResponse.json({ error: `Task assignment failed: ${assignmentError.message}` }, { status: 500 });

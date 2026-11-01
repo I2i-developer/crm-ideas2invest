@@ -56,7 +56,7 @@ export function canUseTasks(role) {
 }
 
 export function canCreateTasks(role) {
-  return isAdmin(role) || isSales(role);
+  return CRM_USER_ROLES.includes(role);
 }
 
 export function canUseChat(role) {

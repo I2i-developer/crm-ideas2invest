@@ -57,7 +57,7 @@ export async function listAssignableTaskUsers(supabase, { actorRole, actorId } =
   if (error) throw new Error(error.message);
 
   const assignableProfiles = (data || []).filter((profile) => isAssignableProfile(profile) &&
-    (actorRole !== "sales" || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
+    (!["sales", "operations"].includes(actorRole) || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
   const profilesWithAuthUsers = await keepProfilesWithAuthUsers(serviceClient, assignableProfiles);
 
   return profilesWithAuthUsers
@@ -84,7 +84,7 @@ export async function getValidTaskAssigneeIds(supabase, assigneeIds = [], { acto
   if (error) throw new Error(error.message);
 
   const validProfiles = (data || []).filter((profile) => isAssignableProfile(profile) &&
-    (actorRole !== "sales" || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
+    (!["sales", "operations"].includes(actorRole) || (["sales", "operations"].includes(profile.role) && profile.id !== actorId)));
   const profilesWithAuthUsers = await keepProfilesWithAuthUsers(serviceClient, validProfiles);
   const validIds = profilesWithAuthUsers.map((profile) => profile.id);
 

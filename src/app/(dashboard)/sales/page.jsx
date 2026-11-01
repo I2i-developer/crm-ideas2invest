@@ -104,8 +104,8 @@ function LeadAddress({ lead, editable = true, onSaved }) {
       setEditing(false); onSaved(data.lead); toast.success("Address saved");
     } catch (e) { toast.error(e.message); } finally { setSaving(false); }
   }
-  if (!editing) return <CrmTooltip content={editable ? "Edit address" : "Address"} className={styles.addressTip}><button type="button" aria-label={editable ? "Edit address" : "Address"} className={styles.addressButton} disabled={!editable} onClick={() => { setValue(lead.address || ""); setVersion(lead.version); setEditing(true); }}><MapPin size={14} /><span className={styles.addressText}>{lead.address || "Add address"}</span>{editable && <Pencil size={12} />}</button></CrmTooltip>;
-  return <div className={styles.addressEditor}><textarea aria-label={`Address for ${lead.name}`} value={value} maxLength={1000} rows={3} disabled={saving} onChange={(e) => setValue(e.target.value)} /><div className={styles.actions}><TipButton type="button" className={styles.iconButton} tooltip="Save address" aria-label="Save address" disabled={saving} onClick={save}>{saving ? <Loader2 size={15} className={styles.spinner} /> : <Save size={15} />}</TipButton><TipButton type="button" className={styles.iconButton} tooltip="Cancel address edit" aria-label="Cancel address edit" disabled={saving} onClick={() => setEditing(false)}><X size={15} /></TipButton></div></div>;
+  if (!editing) return <div className={styles.addressDetail}><div className={styles.addressDetailText}><MapPin size={18} /><p>{lead.address || "No address added"}</p></div>{editable && <button type="button" className={`${styles.secondary} ${styles.openAction}`} onClick={() => { setValue(lead.address || ""); setVersion(lead.version); setEditing(true); }}><Pencil size={15} />Edit address</button>}</div>;
+return <div className={styles.addressDetailEditor}><textarea id="lead-detail-address" aria-label={`Address for ${lead.name}`} value={value} maxLength={1000} rows={4} disabled={saving} onChange={(e) => setValue(e.target.value)} /><div className={styles.addressEditorFooter}><span>{value.length}/1000</span><div className={styles.actions}><button type="button" className={styles.cancel} disabled={saving} onClick={() => setEditing(false)}><X size={15} />Cancel</button><button type="button" className={styles.primary} disabled={saving} onClick={save}>{saving ? <Loader2 size={15} className={styles.spinner} /> : <Save size={15} />}Save address</button></div></div></div>;
 }
 
 export default function SalesWorkspace() {
@@ -137,6 +137,7 @@ export default function SalesWorkspace() {
   const [eod, setEod] = useState([]);
   const [followups, setFollowups] = useState({ followups: [], total: 0 });
   const [followupPage, setFollowupPage] = useState(1);
+  const [followupActor, setFollowupActor] = useState("");
   const [resourceError, setResourceError] = useState("");
   const [resourceLoading, setResourceLoading] = useState(false);
   const [snooze, setSnooze] = useState(null);
@@ -288,15 +289,16 @@ export default function SalesWorkspace() {
     let alive = true;
     setResourceLoading(true); setResourceError("");
     const p = new URLSearchParams({ date: eodDate, source: filters.source, ...(admin && filters.owner && filters.owner !== "unassigned" ? { owner: filters.owner } : {}) });
-    Promise.all([api(`/eod?${p}`), view === "followups" ? api(`/followups?${p}&page=${followupPage}`) : Promise.resolve(null)])
+    Promise.all([api(`/eod?${p}`), view === "followups" ? api(`/followups?${p}&page=${followupPage}&actor=${followupActor}`) : Promise.resolve(null)])
       .then(([daily, due]) => { if (alive) { setEod(daily.rows || []); if (due) setFollowups(due); } })
       .catch((e) => { if (alive) setResourceError(e.message); })
       .finally(() => { if (alive) setResourceLoading(false); });
     return () => { alive = false; };
-  }, [queue.role, admin, view, revision, eodDate, filters.owner, filters.source, followupPage]);
+  }, [queue.role, admin, view, revision, eodDate, filters.owner, filters.source, followupPage, followupActor]);
 
 function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(1); setFollowupPage(1); setFilters((f) => ({ ...f, [key]: value })); }
   function changeSource(id) {
+    setFollowupActor("");
     setProgress(null); setInsights(null);
     requestSeq.current++;
     setQueue((q) => ({ ...q, leads: [], total: 0 })); setLoading(true);
@@ -362,7 +364,7 @@ function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(
         {sourceError && <p role="alert" className={styles.error}>{sourceError}</p>}
         {/* <div className={styles.confidential}><ShieldCheck size={14} /><span>Confidential</span><span className={styles.watermark}>{queue.viewer.name || "Authorized CRM user"} · {viewedAt}</span></div> */}
         <div className={styles.metricHeading}><span>Call activity · {fmt(`${eodDate}T00:00:00+05:30`, true)}</span><small>Recorded attempts, not unique leads</small></div>
-        <div className={styles.metrics}>{METRICS.map(([key, label]) => <button type="button" key={key} className={styles.metric} disabled={!filters.source || resourceLoading} aria-pressed={view === "calls" && callMetric === key} aria-label={`View ${label.toLowerCase()} calls`} onClick={() => { setCallMetric(key); setCallPage(1); setView("calls"); }}><span>{label}</span><strong>{resourceLoading ? "-" : totals[key]}</strong></button>)}</div>
+        <div className={styles.metrics}>{METRICS.map(([key, label], index) => { const Icon = [PhoneCall, Phone, CalendarClock, X, CalendarDays][index]; return <button type="button" key={key} className={styles.metric} disabled={!filters.source || resourceLoading} aria-pressed={view === "calls" && callMetric === key} aria-label={`View ${label.toLowerCase()} calls`} onClick={() => { setCallMetric(key); setCallPage(1); setView("calls"); }}><div className={styles.metricTop}><span>{label}</span><Icon size={18} aria-hidden="true" /></div><div className={styles.metricValue}><strong>{resourceLoading ? "-" : totals[key]}</strong><ChevronRight size={18} aria-hidden="true" /></div></button>; })}</div>
         {filters.source && <SalesInsights data={insights} loading={insightsLoading} error={insightsError} onRetry={refresh} />}
         <nav className={styles.tabs} aria-label="Sales views">{VIEWS.map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? styles.activeTab : ""} aria-current={view === id ? "page" : undefined} onClick={() => { setView(id); const url = new URL(window.location.href); url.searchParams.set("view", id); window.history.replaceState(null, "", url); }}><Icon size={16} />{label}</button>)}</nav>
 
@@ -389,7 +391,7 @@ function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(
                 {queue.leads.map((lead) => <article key={lead.id} data-lead-id={lead.id} tabIndex={-1} className={`${styles.leadRow} ${highlightLeadId === lead.id ? styles.highlightedLead : ""}`}>
                   <div className={styles.leadIdentity}>{admin && lead.import_id && <input type="checkbox" aria-label={`Select ${lead.name}`} checked={selectedIds.includes(lead.id)} onChange={(e) => selectLeads(e.target.checked ? [...selectedIds, lead.id] : selectedIds.filter((id) => id !== lead.id))} />}<div><button className={styles.name} onClick={() => openLead(lead.id)}>{lead.name}</button></div></div>
                   <div data-label="Phone Number"><LeadPhones value={lead.phone} /></div>
-                  <div data-label="Address"><LeadAddress lead={lead} editable={admin || !lead.archived_at} onSaved={addressSaved} /></div>
+                  <div data-label="Address"><CrmTooltip content={lead.address || null} className={styles.addressTip}><span className={styles.queueAddress}>{lead.address || "-"}</span></CrmTooltip></div>
                   <div data-label="Status / Follow-up" className={`${styles.stack} ${styles.statusCell}`}><Status value={lead.status} />{lead.next_due && <span className={new Date(lead.next_due) < new Date() ? styles.overdue : styles.muted}><Clock3 size={12} />{fmt(lead.next_due)}</span>}</div>
                   <div data-label="Latest Remark"><p className={styles.remark}>{lead.latest_activity?.remark || "-"}</p>{lead.latest_activity && <small className={styles.muted}>{fmt(lead.latest_activity.created_at)}</small>}</div>
                   <div data-label="Done by" className={styles.muted}><CrmTooltip content={lead.first_worked_by ? `First activity: ${fmt(lead.first_worked_by.created_at)}` : null} side="left"><span tabIndex={lead.first_worked_by ? 0 : undefined}>{lead.first_worked_by?.name || "-"}</span></CrmTooltip></div>
@@ -412,9 +414,10 @@ function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(
             {!callsLoading && !callsError && <Pager page={callPage} total={calls.total} pageSize={SALES_PAGE_SIZE} onChange={setCallPage} />}
           </section>}
           {view === "followups" && <section>
+            <div className={styles.ownerFilter}><FormSelect label="Follow-up set by" name="followup_actor" value={followupActor} options={ownerOptions} includeAll allLabel="All users" isSearchable onValueChange={(value) => { setFollowupActor(value); setFollowupPage(1); }} /></div>
             {resourceError && <p className={styles.error} role="alert">{resourceError}</p>}
             {resourceLoading ? <div className={styles.empty}>Loading follow-ups...</div> : followups.followups.length ? followups.followups.map((f) => <article key={f.id} className={styles.followupRow}>
-              <div><button className={styles.name} onClick={() => openLead(f.lead_id)}>{f.lead.name}</button><p className={styles.muted}>{f.title}</p></div>
+              <div><button className={styles.name} onClick={() => openLead(f.lead_id)}>{f.lead.name}</button><p className={styles.muted}>{f.title}</p>{f.set_by && <small className={styles.muted}>Set by {f.set_by.name}</small>}</div>
               <span className={Date.parse(f.due_at) <= Date.now() ? styles.overdue : styles.muted}>{fmt(f.due_at)}</span>
               <div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={() => setSnooze(f)}><Clock3 size={15} />Snooze</button><TipButton tooltip="Complete reminder" aria-label="Complete reminder" className={styles.iconButton} disabled={busy} onClick={() => updateReminder(f, "complete")}><Check size={17} /></TipButton><button className={styles.primary} onClick={() => openLead(f.lead_id)}>Open lead<ChevronRight size={15} /></button></div>
             </article>) : <div className={styles.empty}>No pending follow-ups.</div>}
@@ -422,9 +425,9 @@ function changeFilter(key, value) { setSelectedIds([]); setPage(1); setCallPage(
           </section>}
           {view === "calendar" && <MeetingsCalendar key={filters.source} source={filters.source} owner={admin && filters.owner !== "unassigned" ? filters.owner : ""} revision={revision} onOpen={openLead} />}
           {view === "eod" && <section>
-            <div className={styles.eodToolbar}><FormInput name="sales_eod_date" type="date" label="Report date" maxDate={istDate()} value={eodDate} onValueChange={setEodDate} /><p className={styles.muted}>Call attempts recorded between 00:00 and 23:59 IST. Imports, remarks and meeting-only updates are excluded.</p></div>
+<div className={styles.eodToolbar}><FormInput name="sales_eod_date" type="date" label="Report date" required maxDate={istDate()} value={eodDate} onValueChange={(date) => { if (date) setEodDate(date); }} /><p className={styles.muted}>Call attempts recorded between 00:00 and 23:59 IST. Imports, remarks and meeting-only updates are excluded.</p></div>
             {resourceError && <p className={styles.error}>{resourceError}</p>}
-            <div className={styles.eodRows}>{eod.map((row) => <article key={row.user_id} className={styles.eodRow}><h3><UserRound size={16} />{row.user_name}</h3><dl>{METRICS.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key]}</dd></div>)}</dl></article>)}</div>
+            <div className={styles.eodRows}>{eod.map((row) => <article key={row.user_id} className={styles.eodRow}><h3><UserRound size={16} />{row.user_name}</h3><dl>{METRICS.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key]}</dd></div>)}</dl>{queue.role === "sales" && row.user_id === queue.viewer.id && <Link className={styles.primary} onClick={(event) => { if (!document.getElementById("sales_eod_date")?.reportValidity()) event.preventDefault(); }} href={`/sales/eod-report?from=calling-desk&source=${filters.source}&date=${eodDate}`}><ClipboardList size={16} />Prepare EOD report<ChevronRight size={16} /></Link>}</article>)}</div>
             {!eod.length && !resourceLoading && !resourceError && <div className={styles.empty}>No sales activity for this date.</div>}
           </section>}
 

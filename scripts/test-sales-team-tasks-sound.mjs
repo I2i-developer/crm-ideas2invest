@@ -18,6 +18,9 @@ test("Sales task assignee picker and validator exclude Admin, self and inactive 
   assert.deepEqual((await assignees.listAssignableTaskUsers(db,scope)).map(p=>p.id).sort(),["ops","other"]);
   for(const id of ["admin","sales","inactive"])await assert.rejects(assignees.getValidTaskAssigneeIds(db,[id],scope),/inactive|invalid/);
   assert.deepEqual(await assignees.getValidTaskAssigneeIds(db,["other","ops"],scope),["other","ops"]);
+  const operationsScope = {actorRole:"operations",actorId:"ops"};
+  assert.deepEqual((await assignees.listAssignableTaskUsers(db,operationsScope)).map(p=>p.id).sort(),["other","sales"]);
+  for (const id of ["admin","ops","inactive"]) await assert.rejects(assignees.getValidTaskAssigneeIds(db,[id],operationsScope),/inactive|invalid/);
 });
 test("sound requires unlocked audio, deduplicates events and respects hidden pages",async () => {
   let tones=0;const storage=new Map();
@@ -39,12 +42,12 @@ test("sound requires unlocked audio, deduplicates events and respects hidden pag
 });
 
 test("Sales POST uses authenticated atomic creation, scopes validation and blocks client/SIP links",async()=>{
-  let calls=0,notified,scope;
+  let calls=0,notified,scope,actorRole="sales",actorId="sales",targets=["ops"];
   const permissions=await load("src/lib/auth/permissions.js");
-  const db={auth:{getUser:async()=>({data:{user:{id:"sales"}}})},from(table){
-    if(table==="profiles")return{select(){return this},eq(){return this},single:async()=>({data:{role:"sales"}})};
+  const db={auth:{getUser:async()=>({data:{user:{id:actorId}}})},from(table){
+    if(table==="profiles")return{select(){return this},eq(){return this},single:async()=>({data:{role:actorRole}})};
     assert.equal(table,"task_activity_logs");return{insert:async()=>({error:null})};
-  },rpc:async(name,args)=>{calls++;assert.equal(name,"sales_create_team_task");assert.deepEqual(args.p.assigned_to,["ops"]);return{data:{id:"created",created_by:"sales"}}}};
+  },rpc:async(name,args)=>{calls++;assert.equal(name,"sales_create_team_task");assert.deepEqual(args.p.assigned_to,targets);return{data:{id:"created",created_by:actorId}}}};
   const api=await load("src/app/api/tasks/route.js",{
     "next/server":{NextResponse:{json:(data,{status})=>({data,status})}},"node:crypto":await import("node:crypto"),
     "@/lib/auth/permissions":permissions,"@/lib/supabaseServer":{createClient:async()=>db},
@@ -58,6 +61,9 @@ test("Sales POST uses authenticated atomic creation, scopes validation and block
   assert.equal(calls,0);
   assert.equal((await post({title:"Task",assigned_to:["ops"]})).status,201);
   assert.equal(calls,1);assert.deepEqual(scope,{actorRole:"sales",actorId:"sales"});assert.deepEqual(notified,["ops"]);
+  actorRole="operations";actorId="ops";targets=["other"];
+  assert.equal((await post({title:"Operations task",assigned_to:targets})).status,201);
+  assert.deepEqual(scope,{actorRole:"operations",actorId:"ops"});assert.deepEqual(notified,["other"]);
 });
 
 const PGlite = process.env.PGLITE_MODULE ? require(process.env.PGLITE_MODULE).PGlite : null;
@@ -93,5 +99,17 @@ test("Sales task RPC atomically assigns only other Sales/Operations; forged Admi
     await db.exec(`SET request.jwt.claim.sub='${ops}';SET ROLE authenticated;`);await assert.rejects(create([other]),/Forbidden/);
     await db.exec(`RESET ROLE;UPDATE profiles SET is_active=false WHERE id='${other}';SET request.jwt.claim.sub='${sales}';SET ROLE authenticated;`);
     await assert.rejects(create([ops,other]),/other active/);
+    await db.exec("RESET ROLE");
+    const snapshot = (await db.query("SELECT to_jsonb(t) row FROM tasks t ORDER BY id")).rows;
+    const extension = await readFile(new URL("supabase/migrations/202610270002_operations_team_tasks.sql",root),"utf8");
+    await db.exec(extension);await db.exec(extension);
+    assert.deepEqual((await db.query("SELECT to_jsonb(t) row FROM tasks t ORDER BY id")).rows,snapshot);
+    await db.exec(`SET request.jwt.claim.sub='${ops}';SET ROLE authenticated;`);
+    const operationsTask = await create([sales]);
+    assert.equal(operationsTask.created_by,ops);
+    assert.equal((await db.query("SELECT * FROM tasks")).rows[0].id,operationsTask.id);
+    for (const id of [admin,ops,other]) await assert.rejects(create([id]),/other active/);
+    await db.exec("RESET ROLE");
+    await assert.rejects(db.query("INSERT INTO task_assignments(task_id,user_id,assigned_by) VALUES($1,$2,$3)",[operationsTask.id,admin,ops]),/Team members may assign/);
   }finally{await db.close();}
 });

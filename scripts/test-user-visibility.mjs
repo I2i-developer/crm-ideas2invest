@@ -201,10 +201,10 @@ test("Self Reminders includes shared Calling Desk follow-ups without copying or 
   assert.equal(db.writes.length,0);assert.equal(db.tables.client_meeting_reminders.length,0);
 });
 
-test("Admin task list includes Sales-created tasks regardless of creator or assignee", async () => {
-  const db = database({profiles,tasks:[{id:"sales-task",title:"Sales task",created_by:"sales"},{id:"ops-task",title:"Operations task",created_by:"admin"}],task_assignments:[{task_id:"sales-task",user_id:"ops"},{task_id:"ops-task",user_id:"sales"}]},"admin");
+test("Admin task list includes Sales/Operations-created tasks regardless of creator or assignee", async () => {
+  const db = database({profiles,tasks:[{id:"sales-task",title:"Sales task",created_by:"sales"},{id:"ops-task",title:"Operations task",created_by:"ops"},{id:"admin-task",title:"Admin task",created_by:"admin"}],task_assignments:[{task_id:"sales-task",user_id:"ops"},{task_id:"ops-task",user_id:"sales"}]},"admin");
   const api = (await load("src/app/api/tasks/route.js",apiMocks(db))).namespace;
-  assert.deepEqual((await api.GET(request())).data.tasks.map((task)=>task.id),["sales-task","ops-task"]);
+  assert.deepEqual((await api.GET(request())).data.tasks.map((task)=>task.id),["sales-task","ops-task","admin-task"]);
 });
 
 test("Sales can read their historical EOD reports after conversion, not another user's reports", async () => {

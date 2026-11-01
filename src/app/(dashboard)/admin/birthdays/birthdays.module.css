@@ -1,0 +1,62 @@
+.birthdayCard {
+  position: relative;
+}
+
+.birthdayActions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 94%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+:global(.dark) .birthdayActions {
+  background: rgb(17 24 39 / 94%);
+}
+
+.birthdayCard:has(:focus-visible) .birthdayActions,
+.birthdayCard[data-actions-open="true"] .birthdayActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.touchActionsToggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+:global(.dark) .touchActionsToggle {
+  background: #172554;
+  color: #bfdbfe;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .touchActionsToggle { display: none; }
+  .birthdayCard:hover .birthdayActions { opacity: 1; pointer-events: auto; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .birthdayCard > a { padding-right: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .birthdayActions {
+    transition: none;
+  }
+}

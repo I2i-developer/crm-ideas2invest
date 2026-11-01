@@ -10,6 +10,7 @@ import { authFetch } from "@/lib/authFetch";
 import FormInput from "@/app/(dashboard)/admin/clients/components/FormInput";
 import FormSelect from "@/app/(dashboard)/admin/clients/components/FormSelect";
 import { formatDateDDMonYYYY, formatDateTimeDDMonYYYY } from "@/lib/dateFormat";
+import { mergeCallingEodPrefill } from "@/lib/sales/eodPrefill";
 
 const emptyForm = {
   report_date: "",
@@ -66,6 +67,7 @@ export default function EodReportPage({ workspace = "operations" }) {
   const [form, setForm] = useState(emptyForm);
   const [filters, setFilters] = useState({ status: "", date_from: "", date_to: "", search: "" });
   const initializedFormRef = useRef(false);
+  const [callingPrefill, setCallingPrefill] = useState(null), [callingApplied, setCallingApplied] = useState(false);
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -82,7 +84,16 @@ export default function EodReportPage({ workspace = "operations" }) {
       setToday(data.today || new Date().toISOString().slice(0, 10));
       if (!initializedFormRef.current) {
         initializedFormRef.current = true;
-        const todayReport = (data.reports || []).find((report) => report.report_date === data.today);
+        let todayReport = (data.reports || []).find((report) => report.report_date === data.today);
+        const handoff = new URLSearchParams(window.location.search);
+        let calling = null;
+        if (workspace === "sales" && handoff.get("from") === "calling-desk") {
+          const response = await authFetch(`/api/sales/eod-prefill?${new URLSearchParams({ source: handoff.get("source") || "", date: handoff.get("date") || data.today })}`, { cache: "no-store" });
+          calling = await response.json();
+          if (!response.ok) { initializedFormRef.current = false; throw new Error(calling.error || "Unable to prepare calling EOD"); }
+          setCallingPrefill(calling);
+          todayReport = calling.existing_report;
+        }
         if (todayReport) {
           setForm({
             report_date: todayReport.report_date || data.today,
@@ -96,7 +107,8 @@ export default function EodReportPage({ workspace = "operations" }) {
             tasks_pending: numberValue(todayReport.tasks_pending),
           });
         } else {
-          setForm((current) => ({ ...current, report_date: data.today || new Date().toISOString().slice(0, 10) }));
+          setForm((current) => ({ ...current, ...(calling?.prefill || {}), report_date: calling?.prefill?.report_date || data.today || new Date().toISOString().slice(0, 10) }));
+          if (calling) setCallingApplied(true);
         }
       }
     } catch (error) {
@@ -104,7 +116,7 @@ export default function EodReportPage({ workspace = "operations" }) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, workspace]);
 
   useEffect(() => {
     loadReports();
@@ -115,6 +127,7 @@ export default function EodReportPage({ workspace = "operations" }) {
   }
 
   function resetForm() {
+    setCallingPrefill(null); setCallingApplied(false);
     setEditingId("");
     setEditOverlayOpen(false);
     setForm({ ...emptyForm, report_date: today || new Date().toISOString().slice(0, 10) });
@@ -208,6 +221,10 @@ export default function EodReportPage({ workspace = "operations" }) {
       </section>
 
       <form onSubmit={submitReport} className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/60 to-emerald-50/50 p-4 shadow-sm sm:p-5">
+        {callingPrefill && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+          <p>{callingApplied ? `Calling summary prefilled: ${callingPrefill.source_name}. Review before submitting.` : "A report already exists for this date. Its contents have been kept."}</p>
+          {!callingApplied && <button type="button" className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900" onClick={() => { setForm((current) => mergeCallingEodPrefill(current, callingPrefill.prefill)); setCallingApplied(true); }}><ClipboardCheck size={16} />Add calling summary</button>}
+        </div>}
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-950">Create EOD report</h2>

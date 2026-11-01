@@ -227,6 +227,22 @@ device-level capture restrictions.
 
 ### Calling Desk Refinements
 
+Apply `202610270002_operations_team_tasks.sql` after the earlier task migrations.
+Operations now uses the same task-creation flow as Sales: other active Sales or
+Operations recipients only, no Admin/self assignment, and own-created task
+tracking/comments. Admin can see and manage all tasks. The existing RPC/helper
+names remain compatible; no saved tasks or assignments are rewritten.
+
+Calling Queue addresses are read-only; edits happen in lead details. Follow-ups
+can be filtered by the status-setting activity's actor while preserving the
+logged-in Sales user's lead access. This is separate from assigned ownership.
+
+Daily EOD has Prepare EOD report for the current Sales user. It passes only
+source/date to the EOD page, which fetches authenticated call totals and prefills
+an editable draft. It never autosaves. Existing reports stay untouched unless
+the user explicitly adds the calling summary and saves; unrelated text and task
+counts are preserved. No browser storage copy or extra npm package is needed.
+
 Apply `202610270001_sales_calling_updates.sql` after the preceding migrations.
 It permits empty call remarks (notes/meeting activities still require remarks),
 retires Do Not Call for new activities and adds role-scoped, paged call history

@@ -34,6 +34,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Fit the dashboard to the visible viewport, including mobile browser chrome. */
+.crm-shell {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 *,
 *::before,
 *::after {
